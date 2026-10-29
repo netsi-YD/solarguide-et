@@ -1,15 +1,18 @@
 import { SOLAR_CONFIG, type SolarConfig } from "./config.ts";
+import { getDefaultEssentialForName } from "./appliances.ts";
 
 export interface ApplianceInput {
   name?: string;
   watts: number;
   quantity: number;
   hoursPerDay: number;
+  essential?: boolean;
 }
 
 export interface CalculatorInput {
   appliances: ApplianceInput[];
   peakSunHours: number;
+  outageHoursPerDay?: number;
   config?: Partial<SolarConfig>;
 }
 
@@ -18,6 +21,12 @@ export interface CostRangeEtb {
   high: number;
   midpoint: number;
   equipmentCost: number;
+}
+
+export interface BackupCostRangeEtb {
+  low: number;
+  high: number;
+  midpoint: number;
 }
 
 export interface PaybackMonths {
@@ -44,6 +53,20 @@ export interface CalculatorOutput {
   paybackMonthsVsGrid: number;
   /** Convenience top-level payback in months vs generator */
   paybackMonthsVsGenerator: number;
+  /** Outage hours per day used for backup calculation (0 to 12) */
+  outageHoursPerDay: number;
+  /** Daily energy consumption of essential appliances in kWh */
+  essentialDailyKwh: number;
+  /** Combined running power of essential appliances in kW: sum(watts * quantity) / 1000 */
+  essentialPowerKw: number;
+  /** Energy needed during power cut in kWh: min(essentialPowerKw * outageHoursPerDay, essentialDailyKwh) */
+  backupEnergyKwh: number;
+  /** Battery capacity needed for backup in kWh: backupEnergyKwh / batteryDepthOfDischarge */
+  backupBatteryKwh: number;
+  /** Extra battery cost range in ETB (low / high / midpoint) for the backup battery */
+  backupExtraCost: BackupCostRangeEtb;
+  /** Percentage of total daily kWh belonging to essential appliances (0 to 100) */
+  coveredSharePercent: number;
 }
 
 function roundTo(value: number, decimals: number): number {
@@ -70,17 +93,18 @@ export function calculateDailyKwh(appliances: ApplianceInput[]): number {
 
 /**
  * Calculates solar PV sizing, battery capacity, ETB cost range, monthly savings,
- * and payback period in months.
+ * payback period in months, and backup/outage mode sizing.
  *
  * Can be called either as:
- *   `calculateSolarSystem({ appliances, peakSunHours, config })`
+ *   `calculateSolarSystem({ appliances, peakSunHours, outageHoursPerDay, config })`
  * or:
- *   `calculateSolarSystem(appliances, peakSunHours, config)`
+ *   `calculateSolarSystem(appliances, peakSunHours, config, outageHoursPerDay)`
  */
 export function calculateSolarSystem(
   inputOrAppliances: CalculatorInput | ApplianceInput[],
   peakSunHoursArg?: number,
-  configOverrideArg?: Partial<SolarConfig>
+  configOverrideArg?: Partial<SolarConfig>,
+  outageHoursPerDayArg?: number
 ): CalculatorOutput {
   const isObjectInput = !Array.isArray(inputOrAppliances);
 
@@ -99,7 +123,73 @@ export function calculateSolarSystem(
     ...configOverrides,
   };
 
+  const rawOutageHours = isObjectInput
+    ? (inputOrAppliances.outageHoursPerDay ?? cfg.defaultOutageHoursPerDay)
+    : (outageHoursPerDayArg ?? cfg.defaultOutageHoursPerDay);
+
+  const outageHoursPerDay = Math.min(
+    cfg.maxOutageHoursPerDay,
+    Math.max(0, Number(rawOutageHours) || 0)
+  );
+
   const dailyKwh = calculateDailyKwh(appliances);
+
+  // Compute essential appliances power & daily energy
+  let essentialWh = 0;
+  let essentialWattsTotal = 0;
+
+  for (const item of appliances) {
+    const isEssential =
+      typeof item.essential === "boolean"
+        ? item.essential
+        : getDefaultEssentialForName(item.name);
+
+    if (isEssential) {
+      const watts = Math.max(0, Number(item.watts) || 0);
+      const quantity = Math.max(0, Number(item.quantity) || 0);
+      const hoursPerDay = Math.min(
+        24,
+        Math.max(0, Number(item.hoursPerDay) || 0)
+      );
+      essentialWattsTotal += watts * quantity;
+      essentialWh += watts * quantity * hoursPerDay;
+    }
+  }
+
+  const essentialPowerKw = roundTo(essentialWattsTotal / 1000, 4);
+  const essentialDailyKwh = roundTo(essentialWh / 1000, 4);
+
+  const coveredSharePercent =
+    dailyKwh > 0 ? roundTo((essentialDailyKwh / dailyKwh) * 100, 1) : 0;
+
+  const backupEnergyKwh =
+    outageHoursPerDay > 0
+      ? roundTo(
+          Math.min(
+            essentialPowerKw * outageHoursPerDay,
+            essentialDailyKwh
+          ),
+          4
+        )
+      : 0;
+
+  const backupBatteryKwh =
+    backupEnergyKwh > 0 && cfg.batteryDepthOfDischarge > 0
+      ? roundTo(backupEnergyKwh / cfg.batteryDepthOfDischarge, 3)
+      : 0;
+
+  const backupMidpointCost = roundTo(
+    backupBatteryKwh * cfg.batteryCostPerKwhEtb,
+    2
+  );
+  const backupLowCost = roundTo(
+    backupMidpointCost * (1 - cfg.costRangeVariancePct),
+    2
+  );
+  const backupHighCost = roundTo(
+    backupMidpointCost * (1 + cfg.costRangeVariancePct),
+    2
+  );
 
   if (dailyKwh <= 0 || peakSunHours <= 0) {
     return {
@@ -120,6 +210,17 @@ export function calculateSolarSystem(
       },
       paybackMonthsVsGrid: 0,
       paybackMonthsVsGenerator: 0,
+      outageHoursPerDay,
+      essentialDailyKwh,
+      essentialPowerKw,
+      backupEnergyKwh,
+      backupBatteryKwh,
+      backupExtraCost: {
+        low: backupLowCost,
+        high: backupHighCost,
+        midpoint: backupMidpointCost,
+      },
+      coveredSharePercent,
     };
   }
 
@@ -138,7 +239,6 @@ export function calculateSolarSystem(
   const batteryKwh = roundTo(rawBatteryKwh, 3);
 
   // 3. Cost Range (ETB):
-  // Base equipment cost uses unrounded or rounded kW/kWh consistently (using recommendedPanelKw and batteryKwh so hand-checking matches displayed numbers)
   const equipmentCost = roundTo(
     recommendedPanelKw * cfg.panelCostPerKwEtb +
       batteryKwh * cfg.batteryCostPerKwhEtb,
@@ -190,5 +290,16 @@ export function calculateSolarSystem(
     },
     paybackMonthsVsGrid,
     paybackMonthsVsGenerator,
+    outageHoursPerDay,
+    essentialDailyKwh,
+    essentialPowerKw,
+    backupEnergyKwh,
+    backupBatteryKwh,
+    backupExtraCost: {
+      low: backupLowCost,
+      high: backupHighCost,
+      midpoint: backupMidpointCost,
+    },
+    coveredSharePercent,
   };
 }

@@ -31,6 +31,12 @@ export interface TranslationDictionary {
     peakSunHoursBadge: (hours: number) => string;
     cityLabel: string;
     cityOptionLabel: (cityLabel: string, hours: number) => string;
+    powerCutsTitle: string;
+    powerCutsDesc: string;
+    outageHoursLabel: string;
+    outageOffBadge: string;
+    outageActiveBadge: (hours: number) => string;
+    outageHelperText: string;
     step3Title: string;
     step3Desc: string;
     itemsSummaryBadge: (count: number, kwh: string) => string;
@@ -46,6 +52,8 @@ export interface TranslationDictionary {
     emptyListTitle: string;
     emptyListDesc: string;
     wattsEachBadge: (watts: number) => string;
+    essentialBadge: string;
+    essentialCheckboxLabel: string;
     dailyEnergyLabel: string;
     perDayUnit: string;
     quantityLabel: string;
@@ -71,6 +79,15 @@ export interface TranslationDictionary {
     panelLossAllowanceNote: (lossPct: number, sunHours: number) => string;
     batteryCardTitle: string;
     batteryAutonomyNote: (days: number, dodPct: number) => string;
+    backupCardTitle: string;
+    backupHoursBadge: (hours: number) => string;
+    backupPlainSentence: (hours: number) => string;
+    backupBatteryLabel: string;
+    backupEnergyNote: (backupEnergyKwh: string, essentialPowerKw: string) => string;
+    backupExtraCostLabel: string;
+    backupMidpointNote: (midpointEtb: string) => string;
+    coveredShareLabel: string;
+    coveredShareNote: (essentialKwh: string, totalKwh: string) => string;
     costRangeCardTitle: string;
     costRangeCardDesc: (overheadPct: number) => string;
     estimateBadge: string;
@@ -157,7 +174,8 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
   am: {
     meta: {
       brandSubtitle: "የኢትዮጵያ የሶላር ማስያ",
-      footerText: "SolarGuide ET • ለኢትዮጵያ ተጠቃሚዎች በቀላሉ እና በፍጥነት እንዲሰራ ተደርጎ የተዘጋጀ",
+      footerText:
+        "SolarGuide ET • ለኢትዮጵያ ተጠቃሚዎች በቀላሉ እና በፍጥነት እንዲሰራ ተደርጎ የተዘጋጀ",
       langToggleLabel: "ቋንቋ ቀይር",
     },
     home: {
@@ -191,8 +209,17 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
       cityLabel: "ከተማ / አካባቢ (ኢትዮጵያ)",
       cityOptionLabel: (cityLabel, hours) =>
         `${cityLabel} (በቀን ${hours} የፀሐይ ሰዓት)`,
+      powerCutsTitle: "የመብራት መቋረጥ (Backup mode)",
+      powerCutsDesc:
+        "መብራት ሲቋረጥ አስፈላጊ የኤሌክትሪክ ዕቃዎችዎ ለምን ያህል ሰዓት እንዲሰሩ ይፈልጋሉ?",
+      outageHoursLabel: "በቀን መብራት የሚጠፋበት ሰዓት (0–12 ሰዓት)",
+      outageOffBadge: "ጠፍቷል (0 ሰዓት)",
+      outageActiveBadge: (hours) => `በቀን ${hours} ሰዓት መጠባበቂያ`,
+      outageHelperText:
+        "0 ከሆነ መደበኛ የሶላር ስሌት ብቻ ይሰራል። ከ 1 እስከ 12 ሰዓት ከመረጡ ለአስፈላጊ ዕቃዎች የሚያስፈልገውን የመጠባበቂያ ባትሪ ያሰላል።",
       step3Title: "3. የኤሌክትሪክ ዕቃዎች ማስተካከያ",
-      step3Desc: "ዕቃዎችን ይጨምሩ ወይም ይቀንሱ፣ ብዛት እና በቀን የሚሰሩበትን ሰዓት ያስተካክሉ",
+      step3Desc:
+        "ዕቃዎችን ይጨምሩ ወይም ይቀንሱ፣ ብዛት፣ ሰዓት እና በመብራት መቋረጥ ጊዜ አስፈላጊ መሆናቸውን ይምረጡ",
       itemsSummaryBadge: (count, kwh) => `${count} ዕቃዎች • ${kwh} kWh/በቀን`,
       addCommonApplianceLabel: "የተለመዱ የኤሌክትሪክ ዕቃዎችን ይጨምሩ",
       typicalWattsOption: (name, watts) => `${name} (${watts}W አማካይ)`,
@@ -204,8 +231,11 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
       customWattsLabel: "ጉልበት (Watts)",
       saveCustomBtn: "ዕቃውን መዝግብ",
       emptyListTitle: "ምንም የኤሌክትሪክ ዕቃ አልተመረጠም",
-      emptyListDesc: "ከላይ የኤሌክትሪክ ዕቃ መርጠው «ዕቃ ጨምር» የሚለውን ይጫኑ ወይም የመነሻ ፍጆታ ይምረጡ።",
+      emptyListDesc:
+        "ከላይ የኤሌክትሪክ ዕቃ መርጠው «ዕቃ ጨምር» የሚለውን ይጫኑ ወይም የመነሻ ፍጆታ ይምረጡ።",
       wattsEachBadge: (watts) => `እያንዳንዱ ${watts}W`,
+      essentialBadge: "አስፈላጊ",
+      essentialCheckboxLabel: "በመብራት መቋረጥ ጊዜ ይስራ (Essential)",
       dailyEnergyLabel: "የቀን ፍጆታ፦",
       perDayUnit: "kWh/በቀን",
       quantityLabel: "ብዛት",
@@ -236,6 +266,18 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
       batteryCardTitle: "የሚመከር የባትሪ መጠን",
       batteryAutonomyNote: (days, dodPct) =>
         `ለ${days} ቀን መጠባበቂያ (በ${dodPct}% የባትሪ አጠቃቀም)`,
+      backupCardTitle: "የመጠባበቂያ ኃይል (Backup power)",
+      backupHoursBadge: (hours) => `የ${hours} ሰዓት የመብራት መቋረጥ`,
+      backupPlainSentence: (hours) =>
+        `ለ ${hours} ሰዓት መብራት ቢቋረጥ፣ አስፈላጊ ያሏቸው የኤሌክትሪክ ዕቃዎች ያለማቋረጥ ይሰራሉ።`,
+      backupBatteryLabel: "ለመጠባበቂያ የሚያስፈልግ ባትሪ",
+      backupEnergyNote: (backupEnergyKwh, essentialPowerKw) =>
+        `${backupEnergyKwh} kWh የመጠባበቂያ ኃይል (${essentialPowerKw} kW አስፈላጊ ዕቃዎች)`,
+      backupExtraCostLabel: "ተጨማሪ የባትሪ ወጪ ክልል (ETB)",
+      backupMidpointNote: (midpointEtb) => `አማካይ፦ ${midpointEtb} ብር`,
+      coveredShareLabel: "በመቋረጥ ጊዜ የሚሸፈን የቀን ፍጆታ ድርሻ",
+      coveredShareNote: (essentialKwh, totalKwh) =>
+        `${essentialKwh} kWh ከ ${totalKwh} kWh ጠቅላላ የቀን ፍጆታ`,
       costRangeCardTitle: "የጠቅላላ ሲስተም የዋጋ ግምት (ETB)",
       costRangeCardDesc: (overheadPct) =>
         `የሶላር ፓነል፣ ባትሪ እና የ${overheadPct}% የገጠማ ወጪን ያካትታል`,
@@ -247,7 +289,8 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
       monthlySavingsLabel: "ወርሃዊ ቁጠባ፦",
       etbPerMonthUnit: "ብር / በወር",
       paybackTimeLabel: "ወጪውን የሚመልስበት ጊዜ፦",
-      monthsAndYearsValue: (months, years) => `${months} ወራት (~${years} ዓመት)`,
+      monthsAndYearsValue: (months, years) =>
+        `${months} ወራት (~${years} ዓመት)`,
       assumptionsAlertTitle:
         "ማሳሰቢያ፦ ዋጋዎች እና ቁጠባዎች በሚስተካከሉ ግምቶች ላይ የተመሰረቱ ናቸው",
       assumptionsAlertBody: ({
@@ -280,6 +323,8 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
         batteryDepthOfDischarge: "የባትሪ አጠቃቀም DoD (ግምት)",
         batteryAutonomyDays: "የባትሪ መጠባበቂያ ቀናት (ግምት)",
         daysPerMonth: "የወር ቀናት (ግምት)",
+        defaultOutageHoursPerDay: "ነባሪ የመብራት መቋረጥ ሰዓት (ግምት)",
+        maxOutageHoursPerDay: "ከፍተኛ የመብራት መቋረጥ ሰዓት (ግምት)",
       },
       quoteCtaTitle: (cityLabel) =>
         `በ${cityLabel} ከሚገኙ የሶላር አቅራቢዎች ትክክለኛ ዋጋ ማግኘት ይፈልጋሉ?`,
@@ -398,9 +443,17 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
       cityLabel: "City / Region in Ethiopia",
       cityOptionLabel: (cityLabel, hours) =>
         `${cityLabel} (${hours} peak sun hours/day)`,
+      powerCutsTitle: "Power cuts (backup mode)",
+      powerCutsDesc:
+        "How many hours per day should your essential appliances stay powered during an outage?",
+      outageHoursLabel: "Outage hours per day (0–12 hrs)",
+      outageOffBadge: "Off (0 hrs)",
+      outageActiveBadge: (hours) => `${hours}h backup/day`,
+      outageHelperText:
+        "Set to 0 to keep backup mode off. Choose 1–12 hours to size backup battery capacity for appliances marked as essential.",
       step3Title: "3. Appliance Editor",
       step3Desc:
-        "Add or remove appliances and adjust quantity and hours per day",
+        "Add or remove appliances, adjust quantity and hours, and mark essential loads for power cuts",
       itemsSummaryBadge: (count, kwh) =>
         `${count} ${count === 1 ? "item" : "items"} • ${kwh} kWh/day`,
       addCommonApplianceLabel: "Add a common appliance",
@@ -416,6 +469,8 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
       emptyListDesc:
         'Select an appliance above and tap "Add Appliance" or pick a preset profile.',
       wattsEachBadge: (watts) => `${watts}W each`,
+      essentialBadge: "Essential",
+      essentialCheckboxLabel: "Essential during power cuts",
       dailyEnergyLabel: "Daily energy:",
       perDayUnit: "kWh/day",
       quantityLabel: "Quantity",
@@ -446,6 +501,18 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
       batteryCardTitle: "Recommended Battery",
       batteryAutonomyNote: (days, dodPct) =>
         `${days} day autonomy at ${dodPct}% depth of discharge`,
+      backupCardTitle: "Backup power",
+      backupHoursBadge: (hours) => `${hours}-hour power cut`,
+      backupPlainSentence: (hours) =>
+        `During a ${hours}-hour power cut, your essential appliances keep running.`,
+      backupBatteryLabel: "Battery size needed for backup",
+      backupEnergyNote: (backupEnergyKwh, essentialPowerKw) =>
+        `${backupEnergyKwh} kWh backup energy (${essentialPowerKw} kW essential load)`,
+      backupExtraCostLabel: "Extra cost range in ETB",
+      backupMidpointNote: (midpointEtb) => `Midpoint: ${midpointEtb} ETB`,
+      coveredShareLabel: "Share of daily load covered during a cut",
+      coveredShareNote: (essentialKwh, totalKwh) =>
+        `${essentialKwh} kWh of ${totalKwh} kWh total daily load`,
       costRangeCardTitle: "Estimated System Cost Range (ETB)",
       costRangeCardDesc: (overheadPct) =>
         `Includes solar panels, battery storage, and ${overheadPct}% installation overhead`,
@@ -457,7 +524,8 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
       monthlySavingsLabel: "Monthly Savings:",
       etbPerMonthUnit: "ETB / mo",
       paybackTimeLabel: "Payback Time:",
-      monthsAndYearsValue: (months, years) => `${months} months (~${years} yrs)`,
+      monthsAndYearsValue: (months, years) =>
+        `${months} months (~${years} yrs)`,
       assumptionsAlertTitle:
         "Note: Costs & Savings Are Estimates Based on Editable Assumptions",
       assumptionsAlertBody: ({
@@ -485,11 +553,14 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
         installationOverheadPct: "Installation Overhead % (Assumption)",
         costRangeVariancePct: "Cost Variance % (Assumption)",
         gridTariffPerKwhEtb: "Grid Tariff per kWh (Assumption)",
-        generatorFuelCostPerKwhEtb: "Generator Fuel Cost per kWh (Assumption)",
+        generatorFuelCostPerKwhEtb:
+          "Generator Fuel Cost per kWh (Assumption)",
         systemLosses: "System Losses (Assumption)",
         batteryDepthOfDischarge: "Battery Depth of Discharge (Assumption)",
         batteryAutonomyDays: "Battery Autonomy (Assumption)",
         daysPerMonth: "Days per Month (Assumption)",
+        defaultOutageHoursPerDay: "Default Outage Hours (Assumption)",
+        maxOutageHoursPerDay: "Max Outage Window (Assumption)",
       },
       quoteCtaTitle: (cityLabel) =>
         `Ready for real installer pricing in ${cityLabel}?`,

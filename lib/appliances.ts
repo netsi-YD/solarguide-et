@@ -16,6 +16,7 @@ export interface AppliancePreset {
   watts: number;
   defaultQuantity: number;
   defaultHoursPerDay: number;
+  essential: boolean;
 }
 
 export interface PresetApplianceEntry {
@@ -24,6 +25,7 @@ export interface PresetApplianceEntry {
   watts: number;
   quantity: number;
   hoursPerDay: number;
+  essential: boolean;
 }
 
 export type ProfilePresetId = "home" | "small-shop" | "clinic";
@@ -37,7 +39,10 @@ export interface ProfilePreset {
 
 /**
  * Preset list of common Ethiopian household, commercial, and health clinic appliances
- * with typical wattage ratings.
+ * with typical wattage ratings and default essential status for power cuts.
+ *
+ * Default essential = true for lights (LED bulb), phone charger, fridge,
+ * shop freezer, clinic vaccine fridge, and laptop; false for water pump, fan, etc.
  */
 export const APPLIANCE_PRESETS: AppliancePreset[] = [
   {
@@ -46,6 +51,7 @@ export const APPLIANCE_PRESETS: AppliancePreset[] = [
     watts: 10,
     defaultQuantity: 4,
     defaultHoursPerDay: 5,
+    essential: true,
   },
   {
     id: "phone-charger",
@@ -53,6 +59,7 @@ export const APPLIANCE_PRESETS: AppliancePreset[] = [
     watts: 15,
     defaultQuantity: 2,
     defaultHoursPerDay: 3,
+    essential: true,
   },
   {
     id: "tv",
@@ -60,6 +67,7 @@ export const APPLIANCE_PRESETS: AppliancePreset[] = [
     watts: 80,
     defaultQuantity: 1,
     defaultHoursPerDay: 4,
+    essential: false,
   },
   {
     id: "laptop",
@@ -67,6 +75,7 @@ export const APPLIANCE_PRESETS: AppliancePreset[] = [
     watts: 60,
     defaultQuantity: 1,
     defaultHoursPerDay: 6,
+    essential: true,
   },
   {
     id: "fridge",
@@ -74,6 +83,7 @@ export const APPLIANCE_PRESETS: AppliancePreset[] = [
     watts: 150,
     defaultQuantity: 1,
     defaultHoursPerDay: 8,
+    essential: true,
   },
   {
     id: "fan",
@@ -81,6 +91,7 @@ export const APPLIANCE_PRESETS: AppliancePreset[] = [
     watts: 50,
     defaultQuantity: 1,
     defaultHoursPerDay: 6,
+    essential: false,
   },
   {
     id: "water-pump",
@@ -88,6 +99,7 @@ export const APPLIANCE_PRESETS: AppliancePreset[] = [
     watts: 750,
     defaultQuantity: 1,
     defaultHoursPerDay: 1,
+    essential: false,
   },
   {
     id: "sewing-machine",
@@ -95,6 +107,7 @@ export const APPLIANCE_PRESETS: AppliancePreset[] = [
     watts: 100,
     defaultQuantity: 1,
     defaultHoursPerDay: 6,
+    essential: false,
   },
   {
     id: "shop-freezer",
@@ -102,6 +115,7 @@ export const APPLIANCE_PRESETS: AppliancePreset[] = [
     watts: 250,
     defaultQuantity: 1,
     defaultHoursPerDay: 10,
+    essential: true,
   },
   {
     id: "clinic-vaccine-fridge",
@@ -109,6 +123,7 @@ export const APPLIANCE_PRESETS: AppliancePreset[] = [
     watts: 120,
     defaultQuantity: 1,
     defaultHoursPerDay: 12,
+    essential: true,
   },
 ];
 
@@ -119,7 +134,8 @@ export const PROFILE_PRESETS: Record<ProfilePresetId, ProfilePreset> = {
   home: {
     id: "home",
     name: "Home",
-    description: "Typical household lighting, phone charging, TV, and refrigerator",
+    description:
+      "Typical household lighting, phone charging, TV, and refrigerator",
     appliances: [
       {
         applianceId: "led-bulb",
@@ -127,6 +143,7 @@ export const PROFILE_PRESETS: Record<ProfilePresetId, ProfilePreset> = {
         watts: 10,
         quantity: 4,
         hoursPerDay: 5,
+        essential: true,
       },
       {
         applianceId: "phone-charger",
@@ -134,6 +151,7 @@ export const PROFILE_PRESETS: Record<ProfilePresetId, ProfilePreset> = {
         watts: 15,
         quantity: 2,
         hoursPerDay: 3,
+        essential: true,
       },
       {
         applianceId: "tv",
@@ -141,6 +159,7 @@ export const PROFILE_PRESETS: Record<ProfilePresetId, ProfilePreset> = {
         watts: 80,
         quantity: 1,
         hoursPerDay: 4,
+        essential: false,
       },
       {
         applianceId: "fridge",
@@ -148,13 +167,15 @@ export const PROFILE_PRESETS: Record<ProfilePresetId, ProfilePreset> = {
         watts: 150,
         quantity: 1,
         hoursPerDay: 8,
+        essential: true,
       },
     ],
   },
   "small-shop": {
     id: "small-shop",
     name: "Small Shop",
-    description: "Retail shop with lighting, phone charging, fan, and a commercial freezer",
+    description:
+      "Retail shop with lighting, phone charging, fan, and a commercial freezer",
     appliances: [
       {
         applianceId: "led-bulb",
@@ -162,6 +183,7 @@ export const PROFILE_PRESETS: Record<ProfilePresetId, ProfilePreset> = {
         watts: 10,
         quantity: 3,
         hoursPerDay: 8,
+        essential: true,
       },
       {
         applianceId: "phone-charger",
@@ -169,6 +191,7 @@ export const PROFILE_PRESETS: Record<ProfilePresetId, ProfilePreset> = {
         watts: 15,
         quantity: 2,
         hoursPerDay: 4,
+        essential: true,
       },
       {
         applianceId: "fan",
@@ -176,6 +199,7 @@ export const PROFILE_PRESETS: Record<ProfilePresetId, ProfilePreset> = {
         watts: 50,
         quantity: 1,
         hoursPerDay: 8,
+        essential: false,
       },
       {
         applianceId: "shop-freezer",
@@ -183,13 +207,15 @@ export const PROFILE_PRESETS: Record<ProfilePresetId, ProfilePreset> = {
         watts: 250,
         quantity: 1,
         hoursPerDay: 10,
+        essential: true,
       },
     ],
   },
   clinic: {
     id: "clinic",
     name: "Clinic",
-    description: "Rural health post with vaccine cold-chain fridge, lighting, laptop, and fans",
+    description:
+      "Rural health post with vaccine cold-chain fridge, lighting, laptop, and fans",
     appliances: [
       {
         applianceId: "led-bulb",
@@ -197,6 +223,7 @@ export const PROFILE_PRESETS: Record<ProfilePresetId, ProfilePreset> = {
         watts: 10,
         quantity: 6,
         hoursPerDay: 8,
+        essential: true,
       },
       {
         applianceId: "clinic-vaccine-fridge",
@@ -204,6 +231,7 @@ export const PROFILE_PRESETS: Record<ProfilePresetId, ProfilePreset> = {
         watts: 120,
         quantity: 1,
         hoursPerDay: 12,
+        essential: true,
       },
       {
         applianceId: "laptop",
@@ -211,6 +239,7 @@ export const PROFILE_PRESETS: Record<ProfilePresetId, ProfilePreset> = {
         watts: 60,
         quantity: 1,
         hoursPerDay: 6,
+        essential: true,
       },
       {
         applianceId: "fan",
@@ -218,6 +247,7 @@ export const PROFILE_PRESETS: Record<ProfilePresetId, ProfilePreset> = {
         watts: 50,
         quantity: 2,
         hoursPerDay: 6,
+        essential: false,
       },
       {
         applianceId: "phone-charger",
@@ -225,13 +255,38 @@ export const PROFILE_PRESETS: Record<ProfilePresetId, ProfilePreset> = {
         watts: 15,
         quantity: 2,
         hoursPerDay: 4,
+        essential: true,
       },
     ],
   },
 };
 
-export const PROFILE_PRESET_LIST: ProfilePreset[] = Object.values(PROFILE_PRESETS);
+export const PROFILE_PRESET_LIST: ProfilePreset[] =
+  Object.values(PROFILE_PRESETS);
 
 export function getApplianceById(id: ApplianceId): AppliancePreset | undefined {
   return APPLIANCE_PRESETS.find((item) => item.id === id);
+}
+
+/**
+ * Determines the default `essential` flag for an appliance by name if not explicitly set.
+ * Default true for lights, phone charger, fridge, shop freezer, clinic vaccine fridge, laptop;
+ * false for water pump and fan (and TV / sewing machine).
+ */
+export function getDefaultEssentialForName(name?: string): boolean {
+  if (!name) return true;
+  const normalized = name.trim().toLowerCase();
+  const preset = APPLIANCE_PRESETS.find(
+    (p) => p.name.toLowerCase() === normalized || p.id === normalized
+  );
+  if (preset) {
+    return preset.essential;
+  }
+  if (
+    normalized.includes("water pump") ||
+    normalized.includes("fan")
+  ) {
+    return false;
+  }
+  return true;
 }

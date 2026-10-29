@@ -36,6 +36,10 @@ export interface SolarConfig {
   batteryAutonomyDays: number;
   /** ASSUMPTION: Standard days per month used for monthly savings projections (30 days) */
   daysPerMonth: number;
+  /** ASSUMPTION: Default daily power cut / outage duration in hours (0 = backup mode off) */
+  defaultOutageHoursPerDay: number;
+  /** ASSUMPTION: Maximum supported outage duration per day in hours for backup sizing (12 hours) */
+  maxOutageHoursPerDay: number;
 }
 
 export const SOLAR_CONFIG: SolarConfig = {
@@ -68,6 +72,12 @@ export const SOLAR_CONFIG: SolarConfig = {
 
   // ASSUMPTION: 30 days per month
   daysPerMonth: 30,
+
+  // ASSUMPTION: 0 hours/day default outage duration (backup mode off by default)
+  defaultOutageHoursPerDay: 0,
+
+  // ASSUMPTION: 12 hours/day maximum outage duration for backup mode sizing
+  maxOutageHoursPerDay: 12,
 };
 
 /**
@@ -137,5 +147,13 @@ export const ASSUMPTION_DETAILS: AssumptionMeta[] = [
     unit: "day",
     isAssumption: true,
     note: "Assumed 1 day of backup storage autonomy.",
+  },
+  {
+    key: "maxOutageHoursPerDay",
+    label: "Max Outage Window (Assumption)",
+    value: SOLAR_CONFIG.maxOutageHoursPerDay,
+    unit: "hours/day",
+    isAssumption: true,
+    note: "Assumed upper bound of 12 outage hours per day for backup battery sizing.",
   },
 ];

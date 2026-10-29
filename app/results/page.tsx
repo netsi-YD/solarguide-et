@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Sun,
   BatteryCharging,
+  BatteryWarning,
   Zap,
   Banknote,
   TrendingUp,
@@ -115,7 +116,10 @@ function ResultsContent() {
         if (raw) {
           const parsed = JSON.parse(raw) as CalculatorSessionState;
           if (parsed && Array.isArray(parsed.appliances) && parsed.city) {
-            setSessionState(parsed);
+            setSessionState({
+              ...parsed,
+              outageHoursPerDay: Number(parsed.outageHoursPerDay) || 0,
+            });
             setQuoteCity(parsed.city);
             return;
           }
@@ -136,6 +140,7 @@ function ResultsContent() {
   const results = calculateSolarSystem({
     appliances: sessionState.appliances,
     peakSunHours: cityData.peakSunHours,
+    outageHoursPerDay: sessionState.outageHoursPerDay,
     config,
   });
 
@@ -342,6 +347,86 @@ function ResultsContent() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Backup Power Card (shown when outageHoursPerDay > 0) */}
+      {results.outageHoursPerDay > 0 && (
+        <Card className="border-amber-300 bg-gradient-to-br from-amber-50/80 via-white to-emerald-50/40">
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white">
+                  <BatteryWarning className="size-4.5" />
+                </span>
+                <div>
+                  <CardTitle className="text-base sm:text-lg">
+                    {t.results.backupCardTitle}
+                  </CardTitle>
+                  <CardDescription className="text-slate-700 font-medium">
+                    {t.results.backupPlainSentence(results.outageHoursPerDay)}
+                  </CardDescription>
+                </div>
+              </div>
+              <Badge className="bg-amber-600 text-white text-xs">
+                {t.results.backupHoursBadge(results.outageHoursPerDay)}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-amber-200/80 bg-white p-3.5">
+                <div className="text-xs font-medium text-slate-500">
+                  {t.results.backupBatteryLabel}
+                </div>
+                <div className="mt-1 text-xl font-bold text-slate-900">
+                  {results.backupBatteryKwh.toFixed(2)}{" "}
+                  <span className="text-sm font-medium text-slate-600">
+                    kWh
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {t.results.backupEnergyNote(
+                    results.backupEnergyKwh.toFixed(2),
+                    results.essentialPowerKw.toFixed(2)
+                  )}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-amber-200/80 bg-white p-3.5">
+                <div className="text-xs font-medium text-slate-500">
+                  {t.results.backupExtraCostLabel}
+                </div>
+                <div className="mt-1 text-xl font-bold text-slate-900">
+                  {formatEtb(results.backupExtraCost.low)} –{" "}
+                  {formatEtb(results.backupExtraCost.high)}{" "}
+                  <span className="text-sm font-medium text-slate-600">
+                    ETB
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {t.results.backupMidpointNote(
+                    formatEtb(results.backupExtraCost.midpoint)
+                  )}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-emerald-200/80 bg-white p-3.5">
+                <div className="text-xs font-medium text-slate-500">
+                  {t.results.coveredShareLabel}
+                </div>
+                <div className="mt-1 text-xl font-bold text-emerald-700">
+                  {results.coveredSharePercent.toFixed(1)}%
+                </div>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {t.results.coveredShareNote(
+                    results.essentialDailyKwh.toFixed(2),
+                    results.dailyKwh.toFixed(2)
+                  )}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Estimated Cost Range in ETB */}
       <Card className="border-slate-200 bg-white">
@@ -910,11 +995,19 @@ function ResultsContent() {
                   key={item.id}
                   className="flex items-center justify-between gap-2 py-2"
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex flex-wrap items-center gap-1.5">
                     <span className="font-medium text-slate-900">
                       {translateApplianceName(item.name, lang)}
                     </span>
-                    <span className="ml-2 text-xs text-slate-500">
+                    {item.essential && (
+                      <Badge
+                        variant="secondary"
+                        className="bg-emerald-50 text-emerald-800 border-emerald-200 text-[10px]"
+                      >
+                        {t.home.essentialBadge}
+                      </Badge>
+                    )}
+                    <span className="text-xs text-slate-500">
                       {item.quantity} × {item.watts}W × {item.hoursPerDay}{" "}
                       {t.results.hoursPerDayShort}
                     </span>

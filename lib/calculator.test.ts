@@ -145,11 +145,103 @@ describe("Stage 1: Solar Calculator Logic & Supporting Modules", () => {
       assert.ok(getApplianceById("water-pump"));
       assert.ok(getApplianceById("sewing-machine"));
       assert.ok(getApplianceById("shop-freezer"));
-      assert.ok(getApplianceById("clinic-vaccine-fridge"));
+      assert.equal(getApplianceById("clinic-vaccine-fridge")?.essential, true);
+      assert.equal(getApplianceById("led-bulb")?.essential, true);
+      assert.equal(getApplianceById("phone-charger")?.essential, true);
+      assert.equal(getApplianceById("fridge")?.essential, true);
+      assert.equal(getApplianceById("shop-freezer")?.essential, true);
+      assert.equal(getApplianceById("laptop")?.essential, true);
+      assert.equal(getApplianceById("water-pump")?.essential, false);
+      assert.equal(getApplianceById("fan")?.essential, false);
 
       assert.equal(PROFILE_PRESETS.home.name, "Home");
       assert.equal(PROFILE_PRESETS["small-shop"].name, "Small Shop");
       assert.equal(PROFILE_PRESETS.clinic.name, "Clinic");
+    });
+  });
+
+  describe("Stage 5: Backup / Outage Mode calculations", () => {
+    it("calculates 0.4 kWh backup energy and 0.5 kWh battery at 80% DoD for a 100W essential load during 4 outage hours", () => {
+      const result = calculateSolarSystem({
+        appliances: [
+          {
+            name: "Essential load",
+            watts: 100,
+            quantity: 1,
+            hoursPerDay: 8,
+            essential: true,
+          },
+        ],
+        peakSunHours: 5.0,
+        outageHoursPerDay: 4,
+      });
+
+      assert.equal(result.essentialPowerKw, 0.1);
+      assert.equal(result.essentialDailyKwh, 0.8);
+      assert.equal(result.backupEnergyKwh, 0.4);
+      assert.equal(result.backupBatteryKwh, 0.5);
+      // 0.5 kWh * 40,000 ETB/kWh = 20,000 midpoint; ±15% -> 17,000 low / 23,000 high
+      assert.equal(result.backupExtraCost.midpoint, 20_000);
+      assert.equal(result.backupExtraCost.low, 17_000);
+      assert.equal(result.backupExtraCost.high, 23_000);
+      assert.equal(result.coveredSharePercent, 100);
+    });
+
+    it("caps backupEnergyKwh at essentialDailyKwh and computes coveredSharePercent for mixed essential/non-essential loads", () => {
+      // Essential: 100W * 1 * 6h = 0.6 kWh/day (0.1 kW)
+      // Non-essential (Fan): 100W * 1 * 6h = 0.6 kWh/day
+      // Total dailyKwh = 1.2 kWh -> coveredSharePercent = 50%
+      // Outage = 8 hours -> 0.1 kW * 8h = 0.8 kWh, capped at essentialDailyKwh = 0.6 kWh
+      // backupBatteryKwh = 0.6 / 0.80 = 0.75 kWh
+      const result = calculateSolarSystem({
+        appliances: [
+          {
+            name: "Fridge",
+            watts: 100,
+            quantity: 1,
+            hoursPerDay: 6,
+            essential: true,
+          },
+          {
+            name: "Fan",
+            watts: 100,
+            quantity: 1,
+            hoursPerDay: 6,
+            essential: false,
+          },
+        ],
+        peakSunHours: 5.0,
+        outageHoursPerDay: 8,
+      });
+
+      assert.equal(result.dailyKwh, 1.2);
+      assert.equal(result.essentialDailyKwh, 0.6);
+      assert.equal(result.essentialPowerKw, 0.1);
+      assert.equal(result.coveredSharePercent, 50);
+      assert.equal(result.backupEnergyKwh, 0.6);
+      assert.equal(result.backupBatteryKwh, 0.75);
+    });
+
+    it("keeps current behavior unchanged when outageHoursPerDay is 0 (default)", () => {
+      const result = calculateSolarSystem({
+        appliances: [
+          {
+            name: "LED bulb",
+            watts: 10,
+            quantity: 4,
+            hoursPerDay: 5,
+            essential: true,
+          },
+        ],
+        peakSunHours: 5.0,
+      });
+
+      assert.equal(result.outageHoursPerDay, 0);
+      assert.equal(result.backupEnergyKwh, 0);
+      assert.equal(result.backupBatteryKwh, 0);
+      assert.equal(result.backupExtraCost.low, 0);
+      assert.equal(result.backupExtraCost.high, 0);
+      assert.equal(result.coveredSharePercent, 100);
     });
   });
 

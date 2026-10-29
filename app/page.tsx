@@ -14,6 +14,7 @@ import {
   Zap,
   ArrowRight,
   Sun,
+  BatteryWarning,
 } from "lucide-react";
 
 import {
@@ -22,6 +23,7 @@ import {
   type ProfilePresetId,
 } from "@/lib/appliances";
 import { calculateDailyKwh } from "@/lib/calculator";
+import { SOLAR_CONFIG } from "@/lib/config";
 import {
   ETHIOPIAN_CITIES,
   FALLBACK_SUN_HOURS,
@@ -58,6 +60,9 @@ export default function HomePage() {
 
   const [preset, setPreset] = React.useState<PresetSelection>("home");
   const [city, setCity] = React.useState<EthiopianCity>("Addis Ababa");
+  const [outageHoursPerDay, setOutageHoursPerDay] = React.useState<number>(
+    SOLAR_CONFIG.defaultOutageHoursPerDay
+  );
   const [appliances, setAppliances] = React.useState<EditableApplianceItem[]>(
     () => getDefaultAppliancesForPreset("home")
   );
@@ -78,6 +83,7 @@ export default function HomePage() {
         const parsed = JSON.parse(saved) as {
           preset?: PresetSelection;
           city?: EthiopianCity;
+          outageHoursPerDay?: number;
           appliances?: EditableApplianceItem[];
         };
         if (parsed.city && ETHIOPIAN_CITIES.includes(parsed.city)) {
@@ -86,8 +92,22 @@ export default function HomePage() {
         if (parsed.preset) {
           setPreset(parsed.preset);
         }
+        if (typeof parsed.outageHoursPerDay === "number") {
+          setOutageHoursPerDay(
+            Math.min(
+              SOLAR_CONFIG.maxOutageHoursPerDay,
+              Math.max(0, parsed.outageHoursPerDay)
+            )
+          );
+        }
         if (Array.isArray(parsed.appliances) && parsed.appliances.length > 0) {
-          setAppliances(parsed.appliances);
+          setAppliances(
+            parsed.appliances.map((item) => ({
+              ...item,
+              essential:
+                typeof item.essential === "boolean" ? item.essential : true,
+            }))
+          );
         }
       }
     } catch {
@@ -100,6 +120,7 @@ export default function HomePage() {
     (
       nextPreset: PresetSelection,
       nextCity: EthiopianCity,
+      nextOutageHours: number,
       nextAppliances: EditableApplianceItem[]
     ) => {
       try {
@@ -108,6 +129,7 @@ export default function HomePage() {
           JSON.stringify({
             preset: nextPreset,
             city: nextCity,
+            outageHoursPerDay: nextOutageHours,
             appliances: nextAppliances,
           })
         );
@@ -131,10 +153,11 @@ export default function HomePage() {
                 watts: 10,
                 quantity: 4,
                 hoursPerDay: 5,
+                essential: true,
               },
             ];
       setAppliances(nextList);
-      persistState("custom", city, nextList);
+      persistState("custom", city, outageHoursPerDay, nextList);
       return;
     }
 
@@ -142,12 +165,21 @@ export default function HomePage() {
       nextPreset as ProfilePresetId
     );
     setAppliances(presetItems);
-    persistState(nextPreset, city, presetItems);
+    persistState(nextPreset, city, outageHoursPerDay, presetItems);
   };
 
   const handleCityChange = (nextCity: EthiopianCity) => {
     setCity(nextCity);
-    persistState(preset, nextCity, appliances);
+    persistState(preset, nextCity, outageHoursPerDay, appliances);
+  };
+
+  const handleOutageHoursChange = (rawHours: number) => {
+    const clamped = Math.min(
+      SOLAR_CONFIG.maxOutageHoursPerDay,
+      Math.max(0, Math.round(Number(rawHours) * 2) / 2 || 0)
+    );
+    setOutageHoursPerDay(clamped);
+    persistState(preset, city, clamped, appliances);
   };
 
   const handleAddPresetAppliance = () => {
@@ -160,11 +192,12 @@ export default function HomePage() {
       watts: found.watts,
       quantity: found.defaultQuantity,
       hoursPerDay: found.defaultHoursPerDay,
+      essential: found.essential,
     };
 
     const nextList = [...appliances, newItem];
     setAppliances(nextList);
-    persistState(preset, city, nextList);
+    persistState(preset, city, outageHoursPerDay, nextList);
   };
 
   const handleAddCustomAppliance = (e: React.FormEvent) => {
@@ -178,6 +211,7 @@ export default function HomePage() {
       watts: wattsNum,
       quantity: 1,
       hoursPerDay: 4,
+      essential: true,
     };
 
     const nextList = [...appliances, newItem];
@@ -185,13 +219,13 @@ export default function HomePage() {
     setCustomName("");
     setCustomWatts("100");
     setShowCustomForm(false);
-    persistState("custom", city, nextList);
+    persistState("custom", city, outageHoursPerDay, nextList);
   };
 
   const handleRemoveAppliance = (id: string) => {
     const nextList = appliances.filter((item) => item.id !== id);
     setAppliances(nextList);
-    persistState(preset, city, nextList);
+    persistState(preset, city, outageHoursPerDay, nextList);
   };
 
   const handleUpdateQuantity = (
@@ -207,7 +241,7 @@ export default function HomePage() {
       return { ...item, quantity: nextQty };
     });
     setAppliances(nextList);
-    persistState(preset, city, nextList);
+    persistState(preset, city, outageHoursPerDay, nextList);
   };
 
   const handleUpdateHours = (
@@ -222,15 +256,24 @@ export default function HomePage() {
       return { ...item, hoursPerDay: nextHours };
     });
     setAppliances(nextList);
-    persistState(preset, city, nextList);
+    persistState(preset, city, outageHoursPerDay, nextList);
+  };
+
+  const handleToggleEssential = (id: string, checked: boolean) => {
+    const nextList = appliances.map((item) =>
+      item.id === id ? { ...item, essential: checked } : item
+    );
+    setAppliances(nextList);
+    persistState(preset, city, outageHoursPerDay, nextList);
   };
 
   const handleCalculate = () => {
     setIsNavigating(true);
-    persistState(preset, city, appliances);
+    persistState(preset, city, outageHoursPerDay, appliances);
     const queryString = encodeCalculatorSearchParams({
       preset,
       city,
+      outageHoursPerDay,
       appliances,
     });
     router.push(`/results?${queryString}&lang=${lang}`);
@@ -428,6 +471,107 @@ export default function HomePage() {
         </CardContent>
       </Card>
 
+      {/* Power cuts (backup mode) section */}
+      <Card className="border-amber-200/80 bg-amber-50/30">
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-800">
+                <BatteryWarning className="size-4.5" />
+              </span>
+              <div>
+                <CardTitle className="text-base sm:text-lg">
+                  {t.home.powerCutsTitle}
+                </CardTitle>
+                <CardDescription>{t.home.powerCutsDesc}</CardDescription>
+              </div>
+            </div>
+            <Badge
+              variant={outageHoursPerDay > 0 ? "default" : "outline"}
+              className={
+                outageHoursPerDay > 0
+                  ? "bg-amber-600 text-white"
+                  : "bg-white text-slate-600"
+              }
+            >
+              {outageHoursPerDay > 0
+                ? t.home.outageActiveBadge(outageHoursPerDay)
+                : t.home.outageOffBadge}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <Label
+                htmlFor="outage-hours-input"
+                className="text-xs sm:text-sm font-medium text-slate-800"
+              >
+                {t.home.outageHoursLabel}
+              </Label>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  aria-label={t.home.outageHoursLabel}
+                  min={0}
+                  max={SOLAR_CONFIG.maxOutageHoursPerDay}
+                  step={1}
+                  value={outageHoursPerDay}
+                  onChange={(e) =>
+                    handleOutageHoursChange(Number(e.target.value))
+                  }
+                  className="h-2 flex-1 sm:w-40 cursor-pointer accent-amber-600"
+                />
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={() =>
+                      handleOutageHoursChange(outageHoursPerDay - 1)
+                    }
+                    disabled={outageHoursPerDay <= 0}
+                    aria-label="Decrease outage hours"
+                    className="bg-white"
+                  >
+                    <Minus className="size-3.5" />
+                  </Button>
+                  <Input
+                    id="outage-hours-input"
+                    type="number"
+                    min={0}
+                    max={SOLAR_CONFIG.maxOutageHoursPerDay}
+                    step={1}
+                    value={outageHoursPerDay}
+                    onChange={(e) =>
+                      handleOutageHoursChange(Number(e.target.value))
+                    }
+                    className="h-8 w-16 bg-white text-center px-1 font-semibold"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={() =>
+                      handleOutageHoursChange(outageHoursPerDay + 1)
+                    }
+                    disabled={
+                      outageHoursPerDay >= SOLAR_CONFIG.maxOutageHoursPerDay
+                    }
+                    aria-label="Increase outage hours"
+                    className="bg-white"
+                  >
+                    <Plus className="size-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-slate-600">{t.home.outageHelperText}</p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Step 3: Appliance Editor */}
       <Card>
         <CardHeader>
@@ -561,6 +705,14 @@ export default function HomePage() {
                           <Badge variant="outline" className="text-[11px]">
                             {t.home.wattsEachBadge(item.watts)}
                           </Badge>
+                          {item.essential && (
+                            <Badge
+                              variant="secondary"
+                              className="bg-emerald-50 text-emerald-800 border-emerald-200 text-[10px]"
+                            >
+                              {t.home.essentialBadge}
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-xs text-slate-500 mt-0.5">
                           {t.home.dailyEnergyLabel}{" "}
@@ -685,6 +837,25 @@ export default function HomePage() {
                           </Button>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Essential Checkbox */}
+                    <div className="flex items-center pt-1.5 border-t border-slate-100">
+                      <label
+                        htmlFor={`essential-${item.id}`}
+                        className="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none"
+                      >
+                        <input
+                          id={`essential-${item.id}`}
+                          type="checkbox"
+                          checked={item.essential}
+                          onChange={(e) =>
+                            handleToggleEssential(item.id, e.target.checked)
+                          }
+                          className="size-4 rounded border-slate-300 accent-amber-600 cursor-pointer"
+                        />
+                        <span>{t.home.essentialCheckboxLabel}</span>
+                      </label>
                     </div>
                   </div>
                 );
