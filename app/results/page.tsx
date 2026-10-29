@@ -16,16 +16,29 @@ import {
   RotateCcw,
   MessageSquareQuote,
   MapPin,
+  CheckCircle2,
+  AlertCircle,
+  X,
 } from "lucide-react";
 
-import { SOLAR_CONFIG, ASSUMPTION_DETAILS, type SolarConfig } from "@/lib/config";
+import {
+  SOLAR_CONFIG,
+  ASSUMPTION_DETAILS,
+  type SolarConfig,
+} from "@/lib/config";
 import { calculateSolarSystem } from "@/lib/calculator";
-import { FALLBACK_SUN_HOURS } from "@/lib/sunHours";
+import {
+  ETHIOPIAN_CITIES,
+  FALLBACK_SUN_HOURS,
+  type EthiopianCity,
+} from "@/lib/sunHours";
 import {
   STORAGE_KEY,
   decodeCalculatorSearchParams,
   type CalculatorSessionState,
 } from "@/lib/urlState";
+import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
+import { validateQuoteForm } from "@/lib/quoteValidation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -43,7 +56,7 @@ import {
   Input,
   Label,
 } from "@/components/ui/input";
-import { Separator } from "@/components/ui/select";
+import { Select, Separator } from "@/components/ui/select";
 
 function formatEtb(amount: number): string {
   return new Intl.NumberFormat("en-ET", {
@@ -54,16 +67,41 @@ function formatEtb(amount: number): string {
 function ResultsContent() {
   const searchParams = useSearchParams();
 
-  const [sessionState, setSessionState] = React.useState<CalculatorSessionState>(
-    () => decodeCalculatorSearchParams(searchParams)
-  );
+  const [sessionState, setSessionState] =
+    React.useState<CalculatorSessionState>(() =>
+      decodeCalculatorSearchParams(searchParams)
+    );
 
   // Editable assumptions state initialized from SOLAR_CONFIG (/lib/config.ts)
   const [config, setConfig] = React.useState<SolarConfig>(SOLAR_CONFIG);
   const [showAssumptionsEditor, setShowAssumptionsEditor] =
     React.useState(false);
 
-  // If URL had no query params, check sessionStorage for recent state
+  // Quote form state
+  const [showQuoteForm, setShowQuoteForm] = React.useState(false);
+  const [quoteName, setQuoteName] = React.useState("");
+  const [quotePhone, setQuotePhone] = React.useState("");
+  const [quoteCity, setQuoteCity] = React.useState<EthiopianCity>(
+    sessionState.city
+  );
+  const [fieldErrors, setFieldErrors] = React.useState<{
+    name?: string;
+    phone?: string;
+    city?: string;
+  }>({});
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [submittedQuote, setSubmittedQuote] = React.useState<{
+    name: string;
+    phone: string;
+    city: string;
+    panelKw: number;
+    batteryKwh: number;
+    costLow: number;
+    costHigh: number;
+  } | null>(null);
+
+  // Sync session state & prefill quoteCity when searchParams or sessionStorage updates
   React.useEffect(() => {
     if (!searchParams.get("items") && !searchParams.get("city")) {
       try {
@@ -72,14 +110,17 @@ function ResultsContent() {
           const parsed = JSON.parse(raw) as CalculatorSessionState;
           if (parsed && Array.isArray(parsed.appliances) && parsed.city) {
             setSessionState(parsed);
+            setQuoteCity(parsed.city);
+            return;
           }
         }
       } catch {
         // Ignore storage errors
       }
-    } else {
-      setSessionState(decodeCalculatorSearchParams(searchParams));
     }
+    const decoded = decodeCalculatorSearchParams(searchParams);
+    setSessionState(decoded);
+    setQuoteCity(decoded.city);
   }, [searchParams]);
 
   const cityData =
@@ -93,6 +134,83 @@ function ResultsContent() {
 
   const handleResetAssumptions = () => {
     setConfig(SOLAR_CONFIG);
+  };
+
+  const handleOpenQuoteForm = () => {
+    setQuoteCity(cityData.city);
+    setFieldErrors({});
+    setSubmitError(null);
+    setSubmittedQuote(null);
+    setShowQuoteForm(true);
+  };
+
+  const handleQuoteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitError(null);
+
+    const validation = validateQuoteForm({
+      name: quoteName,
+      phone: quotePhone,
+      city: quoteCity,
+    });
+
+    if (!validation.valid) {
+      setFieldErrors(validation.errors);
+      return;
+    }
+
+    setFieldErrors({});
+
+    if (!isSupabaseConfigured()) {
+      setSubmitError(
+        "Supabase is not configured yet. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local and restart the server."
+      );
+      return;
+    }
+
+    const client = getSupabaseClient();
+    if (!client) {
+      setSubmitError("Unable to initialize Supabase client.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await client.from("quote_requests").insert({
+        name: validation.sanitized.name,
+        phone: validation.sanitized.phone,
+        city: validation.sanitized.city,
+        daily_kwh: results.dailyKwh,
+        panel_kw: results.recommendedPanelKw,
+        battery_kwh: results.batteryKwh,
+        estimated_cost_low: results.costRange.low,
+        estimated_cost_high: results.costRange.high,
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setSubmittedQuote({
+        name: validation.sanitized.name,
+        phone: validation.sanitized.phone,
+        city: validation.sanitized.city,
+        panelKw: results.recommendedPanelKw,
+        batteryKwh: results.batteryKwh,
+        costLow: results.costRange.low,
+        costHigh: results.costRange.high,
+      });
+      setQuoteName("");
+      setQuotePhone("");
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Something went wrong while saving your quote request. Please try again.";
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -136,7 +254,8 @@ function ResultsContent() {
               ? "appliance group"
               : "appliance groups"}
           </span>{" "}
-          in <span className="font-semibold text-slate-800">{cityData.city}</span>.
+          in{" "}
+          <span className="font-semibold text-slate-800">{cityData.city}</span>.
         </p>
       </section>
 
@@ -223,8 +342,8 @@ function ResultsContent() {
                 </CardTitle>
                 <CardDescription>
                   Includes solar panels, battery storage, and{" "}
-                  {Math.round(config.installationOverheadPct * 100)}% installation
-                  overhead
+                  {Math.round(config.installationOverheadPct * 100)}%
+                  installation overhead
                 </CardDescription>
               </div>
             </div>
@@ -320,7 +439,8 @@ function ResultsContent() {
             <Info className="size-4.5 text-amber-700 shrink-0 mt-0.5" />
             <div className="flex flex-col gap-1">
               <AlertTitle className="text-amber-950">
-                Note: Costs & Savings Are Estimates Based on Editable Assumptions
+                Note: Costs & Savings Are Estimates Based on Editable
+                Assumptions
               </AlertTitle>
               <AlertDescription className="text-amber-900/90">
                 All equipment prices, installation overhead (
@@ -328,8 +448,8 @@ function ResultsContent() {
                 losses ({Math.round(config.systemLosses * 100)}%), battery depth
                 of discharge ({Math.round(config.batteryDepthOfDischarge * 100)}
                 %), grid tariff ({config.gridTariffPerKwhEtb} ETB/kWh), and
-                generator fuel cost ({config.generatorFuelCostPerKwhEtb} ETB/kWh)
-                are planning assumptions from{" "}
+                generator fuel cost ({config.generatorFuelCostPerKwhEtb}{" "}
+                ETB/kWh) are planning assumptions from{" "}
                 <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-[11px]">
                   /lib/config.ts
                 </code>
@@ -366,7 +486,10 @@ function ResultsContent() {
                   onChange={(e) =>
                     setConfig((prev) => ({
                       ...prev,
-                      panelCostPerKwEtb: Math.max(0, Number(e.target.value) || 0),
+                      panelCostPerKwEtb: Math.max(
+                        0,
+                        Number(e.target.value) || 0
+                      ),
                     }))
                   }
                   className="bg-white"
@@ -494,37 +617,244 @@ function ResultsContent() {
         )}
       </Alert>
 
-      {/* Prominent "Get quotes" CTA Card */}
+      {/* Prominent "Get quotes" CTA & Quote Request Form */}
       <Card className="border-amber-400 bg-gradient-to-br from-amber-500/10 via-white to-amber-50">
-        <CardContent className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center py-2">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-slate-900">
-                Ready for real installer pricing in {cityData.city}?
-              </h2>
-              <Badge variant="secondary" className="text-[11px]">
-                Coming soon
-              </Badge>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-600">
-              Compare quotes from solar suppliers in Ethiopia for a{" "}
-              <span className="font-semibold text-slate-800">
-                {results.recommendedPanelKw.toFixed(2)} kW panel +{" "}
+        <CardContent className="flex flex-col gap-4 py-2">
+          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-slate-900">
+                  Ready for real installer pricing in {cityData.city}?
+                </h2>
+                <Badge
+                  variant="secondary"
+                  className="bg-amber-100 text-amber-900 text-[11px]"
+                >
+                  Free Quote Request
+                </Badge>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-600">
+                Request quotes from solar installers in Ethiopia for a{" "}
+                <span className="font-semibold text-slate-800">
+                  {results.recommendedPanelKw.toFixed(2)} kW panel +{" "}
                 {results.batteryKwh.toFixed(2)} kWh battery
-              </span>{" "}
-              system.
-            </p>
+                </span>{" "}
+                system.
+              </p>
+            </div>
+
+            {!showQuoteForm && (
+              <Button
+                type="button"
+                size="lg"
+                onClick={handleOpenQuoteForm}
+                className="h-12 w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white px-7 text-base font-bold shadow-sm"
+              >
+                <MessageSquareQuote className="size-5" />
+                Get quotes
+              </Button>
+            )}
           </div>
 
-          <Button
-            type="button"
-            size="lg"
-            disabled
-            className="h-12 w-full sm:w-auto bg-amber-600 text-white px-7 text-base font-bold shadow-sm disabled:opacity-80"
-          >
-            <MessageSquareQuote className="size-5" />
-            Get quotes
-          </Button>
+          {/* Quote Request Form or Confirmation Screen */}
+          {showQuoteForm && (
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+              {submittedQuote ? (
+                <div
+                  role="status"
+                  className="flex flex-col items-center text-center gap-3 py-4"
+                >
+                  <span className="flex size-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                    <CheckCircle2 className="size-7" />
+                  </span>
+                  <div className="flex flex-col gap-1 max-w-md">
+                    <h3 className="text-lg font-bold text-slate-900">
+                      Quote Request Received!
+                    </h3>
+                    <p className="text-sm text-slate-600">
+                      Thank you,{" "}
+                      <span className="font-semibold text-slate-900">
+                        {submittedQuote.name}
+                      </span>
+                      . Your request for a{" "}
+                      <span className="font-semibold text-slate-900">
+                        {submittedQuote.panelKw.toFixed(2)} kW panel /{" "}
+                        {submittedQuote.batteryKwh.toFixed(2)} kWh battery
+                      </span>{" "}
+                      system in{" "}
+                      <span className="font-semibold text-slate-900">
+                        {submittedQuote.city}
+                      </span>{" "}
+                      (estimated {formatEtb(submittedQuote.costLow)} –{" "}
+                      {formatEtb(submittedQuote.costHigh)} ETB) has been saved.
+                      Installers will contact you at{" "}
+                      <span className="font-semibold text-slate-900">
+                        {submittedQuote.phone}
+                      </span>
+                      .
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSubmittedQuote(null);
+                        setShowQuoteForm(false);
+                      }}
+                    >
+                      Done
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => setSubmittedQuote(null)}
+                      className="bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                      Submit Another Request
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <form
+                  onSubmit={handleQuoteSubmit}
+                  noValidate
+                  className="flex flex-col gap-4"
+                >
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <div>
+                      <h3 className="font-semibold text-sm sm:text-base text-slate-900">
+                        Request Solar Installer Quotes
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Your calculated system size (
+                        {results.recommendedPanelKw.toFixed(2)} kW panel,{" "}
+                        {results.batteryKwh.toFixed(2)} kWh battery) will be
+                        included automatically.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setShowQuoteForm(false)}
+                      aria-label="Close quote form"
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </div>
+
+                  {submitError && (
+                    <Alert className="border-red-200 bg-red-50 text-red-900">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="size-4 text-red-600 shrink-0 mt-0.5" />
+                        <div>
+                          <AlertTitle className="text-red-900 text-xs font-semibold">
+                            Could not submit quote request
+                          </AlertTitle>
+                          <AlertDescription className="text-red-800 text-xs">
+                            {submitError}
+                          </AlertDescription>
+                        </div>
+                      </div>
+                    </Alert>
+                  )}
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="quote-name">Full Name *</Label>
+                      <Input
+                        id="quote-name"
+                        placeholder="e.g. Abebe Bikila"
+                        value={quoteName}
+                        onChange={(e) => {
+                          setQuoteName(e.target.value);
+                          if (fieldErrors.name) {
+                            setFieldErrors((prev) => ({
+                              ...prev,
+                              name: undefined,
+                            }));
+                          }
+                        }}
+                        aria-invalid={Boolean(fieldErrors.name)}
+                      />
+                      {fieldErrors.name && (
+                        <p className="text-xs text-red-600">
+                          {fieldErrors.name}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="quote-phone">Phone Number *</Label>
+                      <Input
+                        id="quote-phone"
+                        type="tel"
+                        placeholder="e.g. 0911234567 or +251911234567"
+                        value={quotePhone}
+                        onChange={(e) => {
+                          setQuotePhone(e.target.value);
+                          if (fieldErrors.phone) {
+                            setFieldErrors((prev) => ({
+                              ...prev,
+                              phone: undefined,
+                            }));
+                          }
+                        }}
+                        aria-invalid={Boolean(fieldErrors.phone)}
+                      />
+                      {fieldErrors.phone && (
+                        <p className="text-xs text-red-600">
+                          {fieldErrors.phone}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="quote-city">City *</Label>
+                      <Select
+                        id="quote-city"
+                        value={quoteCity}
+                        onChange={(e) =>
+                          setQuoteCity(e.target.value as EthiopianCity)
+                        }
+                      >
+                        {ETHIOPIAN_CITIES.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </Select>
+                      {fieldErrors.city && (
+                        <p className="text-xs text-red-600">
+                          {fieldErrors.city}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowQuoteForm(false)}
+                      disabled={isSubmitting}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="bg-amber-600 hover:bg-amber-700 text-white px-6 font-semibold"
+                    >
+                      {isSubmitting ? "Submitting..." : "Submit Quote Request"}
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

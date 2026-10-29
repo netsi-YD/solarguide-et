@@ -17,6 +17,10 @@ import {
   getFallbackSunHours,
   getSunHours,
 } from "./sunHours.ts";
+import {
+  isValidPhoneNumber,
+  validateQuoteForm,
+} from "./quoteValidation.ts";
 
 describe("Stage 1: Solar Calculator Logic & Supporting Modules", () => {
   describe("calculator.ts - Hand-checked examples", () => {
@@ -198,6 +202,38 @@ describe("Stage 1: Solar Calculator Logic & Supporting Modules", () => {
         fallbackResult.peakSunHours,
         FALLBACK_SUN_HOURS["Bahir Dar"].peakSunHours
       );
+    });
+  });
+
+  describe("quoteValidation.ts - Quote form & Ethiopian phone validation", () => {
+    it("validates Ethiopian and international phone numbers and rejects invalid strings", () => {
+      assert.equal(isValidPhoneNumber("0911234567"), true);
+      assert.equal(isValidPhoneNumber("0712345678"), true);
+      assert.equal(isValidPhoneNumber("+251 911 234 567"), true);
+      assert.equal(isValidPhoneNumber("251911234567"), true);
+      assert.equal(isValidPhoneNumber(""), false);
+      assert.equal(isValidPhoneNumber("12345"), false);
+      assert.equal(isValidPhoneNumber("not-a-phone"), false);
+    });
+
+    it("requires non-empty name, valid phone, and city", () => {
+      const invalid = validateQuoteForm({
+        name: " ",
+        phone: "123",
+        city: "Addis Ababa",
+      });
+      assert.equal(invalid.valid, false);
+      assert.ok(invalid.errors.name);
+      assert.ok(invalid.errors.phone);
+
+      const valid = validateQuoteForm({
+        name: "  Abebe Bikila ",
+        phone: "0911234567",
+        city: "Addis Ababa",
+      });
+      assert.equal(valid.valid, true);
+      assert.equal(valid.sanitized.name, "Abebe Bikila");
+      assert.equal(valid.sanitized.phone, "0911234567");
     });
   });
 });
