@@ -1,12 +1,20 @@
+import * as React from "react";
 import type { Metadata } from "next";
-import Link from "next/link";
-import { Sun } from "lucide-react";
+import { Noto_Sans_Ethiopic } from "next/font/google";
+import { LanguageProvider } from "@/components/LanguageProvider";
 import "./globals.css";
 
+const notoSansEthiopic = Noto_Sans_Ethiopic({
+  subsets: ["ethiopic", "latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-sans",
+});
+
 export const metadata: Metadata = {
-  title: "SolarGuide Ethiopia | Solar Sizing & Cost Calculator",
+  title: "SolarGuide Ethiopia | የኢትዮጵያ የሶላር ማስያ",
   description:
-    "Mobile-first solar sizing, battery storage, and ETB cost estimator for Ethiopian homes, small shops, and clinics.",
+    "Mobile-first solar sizing, battery storage, and ETB cost estimator for Ethiopian homes, small shops, and clinics in Amharic and English.",
 };
 
 export default function RootLayout({
@@ -15,36 +23,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
-      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900 font-sans">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-xs">
-          <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4">
-            <Link
-              href="/"
-              className="flex items-center gap-2 font-semibold tracking-tight text-slate-900"
-            >
-              <span className="flex size-8 items-center justify-center rounded-lg bg-amber-500 text-white shadow-2xs">
-                <Sun className="size-4.5" />
-              </span>
-              <span>
-                SolarGuide <span className="text-amber-600">ET</span>
-              </span>
-            </Link>
-            <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800 border border-amber-200/70">
-              Ethiopia Solar Estimator
-            </span>
-          </div>
-        </header>
-
-        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5 sm:py-8">
-          {children}
-        </main>
-
-        <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
-          <div className="mx-auto max-w-3xl px-4">
-            SolarGuide ET • Designed for fast, low-bandwidth access across Ethiopia
-          </div>
-        </footer>
+    <html
+      lang="am"
+      className={`${notoSansEthiopic.variable} ${notoSansEthiopic.className} h-full antialiased`}
+    >
+      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900">
+        <React.Suspense
+          fallback={
+            <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 text-center text-sm text-slate-500">
+              በመጫን ላይ... / Loading...
+            </div>
+          }
+        >
+          <LanguageProvider>{children}</LanguageProvider>
+        </React.Suspense>
       </body>
     </html>
   );

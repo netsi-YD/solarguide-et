@@ -39,6 +39,11 @@ import {
 } from "@/lib/urlState";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 import { validateQuoteForm } from "@/lib/quoteValidation";
+import {
+  translateApplianceName,
+  translateCityName,
+} from "@/lib/translations";
+import { useLanguage } from "@/components/LanguageProvider";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -66,6 +71,7 @@ function formatEtb(amount: number): string {
 
 function ResultsContent() {
   const searchParams = useSearchParams();
+  const { lang, t } = useLanguage();
 
   const [sessionState, setSessionState] =
     React.useState<CalculatorSessionState>(() =>
@@ -94,7 +100,7 @@ function ResultsContent() {
   const [submittedQuote, setSubmittedQuote] = React.useState<{
     name: string;
     phone: string;
-    city: string;
+    city: EthiopianCity;
     panelKw: number;
     batteryKwh: number;
     costLow: number;
@@ -125,6 +131,7 @@ function ResultsContent() {
 
   const cityData =
     FALLBACK_SUN_HOURS[sessionState.city] ?? FALLBACK_SUN_HOURS["Addis Ababa"];
+  const localizedCityName = translateCityName(cityData.city, lang);
 
   const results = calculateSolarSystem({
     appliances: sessionState.appliances,
@@ -148,11 +155,14 @@ function ResultsContent() {
     e.preventDefault();
     setSubmitError(null);
 
-    const validation = validateQuoteForm({
-      name: quoteName,
-      phone: quotePhone,
-      city: quoteCity,
-    });
+    const validation = validateQuoteForm(
+      {
+        name: quoteName,
+        phone: quotePhone,
+        city: quoteCity,
+      },
+      lang
+    );
 
     if (!validation.valid) {
       setFieldErrors(validation.errors);
@@ -162,15 +172,13 @@ function ResultsContent() {
     setFieldErrors({});
 
     if (!isSupabaseConfigured()) {
-      setSubmitError(
-        "Supabase is not configured yet. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local and restart the server."
-      );
+      setSubmitError(t.results.supabaseUnconfiguredError);
       return;
     }
 
     const client = getSupabaseClient();
     if (!client) {
-      setSubmitError("Unable to initialize Supabase client.");
+      setSubmitError(t.results.supabaseInitError);
       return;
     }
 
@@ -194,7 +202,7 @@ function ResultsContent() {
       setSubmittedQuote({
         name: validation.sanitized.name,
         phone: validation.sanitized.phone,
-        city: validation.sanitized.city,
+        city: quoteCity,
         panelKw: results.recommendedPanelKw,
         batteryKwh: results.batteryKwh,
         costLow: results.costRange.low,
@@ -204,9 +212,9 @@ function ResultsContent() {
       setQuotePhone("");
     } catch (err) {
       const message =
-        err instanceof Error
+        err instanceof Error && err.message
           ? err.message
-          : "Something went wrong while saving your quote request. Please try again.";
+          : t.results.genericSubmitError;
       setSubmitError(message);
     } finally {
       setIsSubmitting(false);
@@ -214,24 +222,27 @@ function ResultsContent() {
   };
 
   return (
-    <div className="flex flex-col gap-6 pb-12">
+    <div className="flex flex-col gap-5 sm:gap-6 pb-12">
       {/* Top navigation & summary header */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Link
-          href="/"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900"
+          href={`/?lang=${lang}`}
+          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900"
         >
           <ArrowLeft className="size-4" />
-          Back to Appliance Editor
+          {t.results.backToEditor}
         </Link>
 
         <div className="flex items-center gap-2">
           <Badge
             variant="outline"
-            className="gap-1 bg-amber-50 text-amber-900 border-amber-200"
+            className="gap-1 bg-amber-50 text-amber-900 border-amber-200 text-xs"
           >
             <MapPin className="size-3.5 text-amber-600" />
-            {cityData.city} ({cityData.peakSunHours} peak sun hrs)
+            {t.results.peakSunHoursBadge(
+              localizedCityName,
+              cityData.peakSunHours
+            )}
           </Badge>
         </div>
       </div>
@@ -239,23 +250,18 @@ function ResultsContent() {
       <section className="flex flex-col gap-1.5">
         <Badge
           variant="secondary"
-          className="bg-emerald-100 text-emerald-900 border-emerald-200"
+          className="bg-emerald-100 text-emerald-900 border-emerald-200 text-xs"
         >
-          Step 2 of 2 • Recommended Solar System
+          {t.results.stepBadge}
         </Badge>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-          Your Solar Sizing & Cost Estimate
+        <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+          {t.results.title}
         </h1>
-        <p className="text-sm text-slate-600">
-          Based on{" "}
-          <span className="font-semibold text-slate-800">
-            {sessionState.appliances.length}{" "}
-            {sessionState.appliances.length === 1
-              ? "appliance group"
-              : "appliance groups"}
-          </span>{" "}
-          in{" "}
-          <span className="font-semibold text-slate-800">{cityData.city}</span>.
+        <p className="text-xs sm:text-sm text-slate-600">
+          {t.results.subtitle(
+            sessionState.appliances.length,
+            localizedCityName
+          )}
         </p>
       </section>
 
@@ -265,7 +271,7 @@ function ResultsContent() {
           <CardHeader className="pb-1">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium uppercase tracking-wider text-slate-500">
-                Daily Energy Use
+                {t.results.dailyEnergyCardTitle}
               </span>
               <Zap className="size-4 text-amber-500" />
             </div>
@@ -273,13 +279,15 @@ function ResultsContent() {
           <CardContent>
             <div className="text-2xl font-bold text-slate-900 sm:text-3xl">
               {results.dailyKwh.toFixed(2)}{" "}
-              <span className="text-base font-medium text-slate-500">
-                kWh/day
+              <span className="text-sm sm:text-base font-medium text-slate-500">
+                {t.results.kwhPerDayUnit}
               </span>
             </div>
             <p className="text-xs text-slate-500">
-              {Math.round(results.dailyKwh * 1000)} Wh/day •{" "}
-              {(results.dailyKwh * config.daysPerMonth).toFixed(1)} kWh/month
+              {t.results.whAndMonthlySummary(
+                Math.round(results.dailyKwh * 1000),
+                (results.dailyKwh * config.daysPerMonth).toFixed(1)
+              )}
             </p>
           </CardContent>
         </Card>
@@ -288,7 +296,7 @@ function ResultsContent() {
           <CardHeader className="pb-1">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium uppercase tracking-wider text-amber-900/80">
-                Recommended Panel Size
+                {t.results.panelCardTitle}
               </span>
               <Sun className="size-4 text-amber-600" />
             </div>
@@ -296,11 +304,15 @@ function ResultsContent() {
           <CardContent>
             <div className="text-2xl font-bold text-slate-900 sm:text-3xl">
               {results.recommendedPanelKw.toFixed(2)}{" "}
-              <span className="text-base font-medium text-slate-600">kW</span>
+              <span className="text-sm sm:text-base font-medium text-slate-600">
+                kW
+              </span>
             </div>
             <p className="text-xs text-slate-600">
-              Includes {Math.round(config.systemLosses * 100)}% system loss
-              allowance at {cityData.peakSunHours}h sun
+              {t.results.panelLossAllowanceNote(
+                Math.round(config.systemLosses * 100),
+                cityData.peakSunHours
+              )}
             </p>
           </CardContent>
         </Card>
@@ -309,7 +321,7 @@ function ResultsContent() {
           <CardHeader className="pb-1">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium uppercase tracking-wider text-emerald-900/80">
-                Recommended Battery
+                {t.results.batteryCardTitle}
               </span>
               <BatteryCharging className="size-4 text-emerald-600" />
             </div>
@@ -317,12 +329,15 @@ function ResultsContent() {
           <CardContent>
             <div className="text-2xl font-bold text-slate-900 sm:text-3xl">
               {results.batteryKwh.toFixed(2)}{" "}
-              <span className="text-base font-medium text-slate-600">kWh</span>
+              <span className="text-sm sm:text-base font-medium text-slate-600">
+                kWh
+              </span>
             </div>
             <p className="text-xs text-slate-600">
-              {config.batteryAutonomyDays} day autonomy at{" "}
-              {Math.round(config.batteryDepthOfDischarge * 100)}% depth of
-              discharge
+              {t.results.batteryAutonomyNote(
+                config.batteryAutonomyDays,
+                Math.round(config.batteryDepthOfDischarge * 100)
+              )}
             </p>
           </CardContent>
         </Card>
@@ -331,44 +346,44 @@ function ResultsContent() {
       {/* Estimated Cost Range in ETB */}
       <Card className="border-slate-200 bg-white">
         <CardHeader>
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
                 <Banknote className="size-4.5" />
               </span>
               <div>
                 <CardTitle className="text-base sm:text-lg">
-                  Estimated System Cost Range (ETB)
+                  {t.results.costRangeCardTitle}
                 </CardTitle>
                 <CardDescription>
-                  Includes solar panels, battery storage, and{" "}
-                  {Math.round(config.installationOverheadPct * 100)}%
-                  installation overhead
+                  {t.results.costRangeCardDesc(
+                    Math.round(config.installationOverheadPct * 100)
+                  )}
                 </CardDescription>
               </div>
             </div>
             <Badge variant="outline" className="text-xs">
-              Estimate (Assumption)
+              {t.results.estimateBadge}
             </Badge>
           </div>
         </CardHeader>
 
         <CardContent className="gap-4">
-          <div className="rounded-xl border border-amber-200/80 bg-amber-50/50 p-4 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+          <div className="rounded-xl border border-amber-200/80 bg-amber-50/50 p-3.5 sm:p-4 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
             <div>
               <span className="text-xs font-medium uppercase tracking-wider text-amber-900/70">
-                Estimated Installed Cost Range
+                {t.results.installedCostRangeLabel}
               </span>
-              <div className="text-2xl font-extrabold text-slate-900 sm:text-3xl mt-0.5">
+              <div className="text-xl font-extrabold text-slate-900 sm:text-3xl mt-0.5">
                 {formatEtb(results.costRange.low)} –{" "}
                 {formatEtb(results.costRange.high)}{" "}
-                <span className="text-base font-semibold text-slate-600">
+                <span className="text-sm sm:text-base font-semibold text-slate-600">
                   ETB
                 </span>
               </div>
             </div>
             <div className="text-xs text-slate-600">
-              Midpoint estimate:{" "}
+              {t.results.midpointEstimateLabel}{" "}
               <span className="font-semibold text-slate-900">
                 {formatEtb(results.costRange.midpoint)} ETB
               </span>
@@ -380,25 +395,29 @@ function ResultsContent() {
             <div className="rounded-xl border border-slate-200 p-3.5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-700">
-                  Compared to Backup Generator
+                  {t.results.vsGeneratorTitle}
                 </span>
-                <TrendingUp className="size-4 text-emerald-600" />
+                <TrendingUp className="size-4 text-emerald-600 shrink-0" />
               </div>
-              <div className="flex items-baseline justify-between">
-                <span className="text-xs text-slate-500">Monthly Savings:</span>
-                <span className="text-base font-bold text-emerald-700">
-                  {formatEtb(results.monthlySavingsVsGenerator)} ETB / mo
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-xs text-slate-500">
+                  {t.results.monthlySavingsLabel}
+                </span>
+                <span className="text-sm sm:text-base font-bold text-emerald-700">
+                  {formatEtb(results.monthlySavingsVsGenerator)}{" "}
+                  {t.results.etbPerMonthUnit}
                 </span>
               </div>
-              <div className="flex items-baseline justify-between border-t border-slate-100 pt-2">
+              <div className="flex items-baseline justify-between gap-2 border-t border-slate-100 pt-2">
                 <span className="text-xs text-slate-500 inline-flex items-center gap-1">
-                  <Clock className="size-3" /> Payback Time:
+                  <Clock className="size-3 shrink-0" />{" "}
+                  {t.results.paybackTimeLabel}
                 </span>
-                <span className="text-sm font-semibold text-slate-900">
-                  {results.paybackMonths.vsGenerator} months{" "}
-                  <span className="text-xs font-normal text-slate-500">
-                    (~{(results.paybackMonths.vsGenerator / 12).toFixed(1)} yrs)
-                  </span>
+                <span className="text-xs sm:text-sm font-semibold text-slate-900 text-right">
+                  {t.results.monthsAndYearsValue(
+                    results.paybackMonths.vsGenerator,
+                    (results.paybackMonths.vsGenerator / 12).toFixed(1)
+                  )}
                 </span>
               </div>
             </div>
@@ -406,25 +425,29 @@ function ResultsContent() {
             <div className="rounded-xl border border-slate-200 p-3.5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-700">
-                  Compared to Grid Tariff (EEU)
+                  {t.results.vsGridTitle}
                 </span>
-                <TrendingUp className="size-4 text-blue-600" />
+                <TrendingUp className="size-4 text-blue-600 shrink-0" />
               </div>
-              <div className="flex items-baseline justify-between">
-                <span className="text-xs text-slate-500">Monthly Savings:</span>
-                <span className="text-base font-bold text-blue-700">
-                  {formatEtb(results.monthlySavingsVsGrid)} ETB / mo
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-xs text-slate-500">
+                  {t.results.monthlySavingsLabel}
+                </span>
+                <span className="text-sm sm:text-base font-bold text-blue-700">
+                  {formatEtb(results.monthlySavingsVsGrid)}{" "}
+                  {t.results.etbPerMonthUnit}
                 </span>
               </div>
-              <div className="flex items-baseline justify-between border-t border-slate-100 pt-2">
+              <div className="flex items-baseline justify-between gap-2 border-t border-slate-100 pt-2">
                 <span className="text-xs text-slate-500 inline-flex items-center gap-1">
-                  <Clock className="size-3" /> Payback Time:
+                  <Clock className="size-3 shrink-0" />{" "}
+                  {t.results.paybackTimeLabel}
                 </span>
-                <span className="text-sm font-semibold text-slate-900">
-                  {results.paybackMonths.vsGrid} months{" "}
-                  <span className="text-xs font-normal text-slate-500">
-                    (~{(results.paybackMonths.vsGrid / 12).toFixed(1)} yrs)
-                  </span>
+                <span className="text-xs sm:text-sm font-semibold text-slate-900 text-right">
+                  {t.results.monthsAndYearsValue(
+                    results.paybackMonths.vsGrid,
+                    (results.paybackMonths.vsGrid / 12).toFixed(1)
+                  )}
                 </span>
               </div>
             </div>
@@ -434,26 +457,23 @@ function ResultsContent() {
 
       {/* Clear Note on Editable Assumptions */}
       <Alert className="border-amber-300/80 bg-amber-50/70">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-2.5">
             <Info className="size-4.5 text-amber-700 shrink-0 mt-0.5" />
             <div className="flex flex-col gap-1">
               <AlertTitle className="text-amber-950">
-                Note: Costs & Savings Are Estimates Based on Editable
-                Assumptions
+                {t.results.assumptionsAlertTitle}
               </AlertTitle>
               <AlertDescription className="text-amber-900/90">
-                All equipment prices, installation overhead (
-                {Math.round(config.installationOverheadPct * 100)}%), system
-                losses ({Math.round(config.systemLosses * 100)}%), battery depth
-                of discharge ({Math.round(config.batteryDepthOfDischarge * 100)}
-                %), grid tariff ({config.gridTariffPerKwhEtb} ETB/kWh), and
-                generator fuel cost ({config.generatorFuelCostPerKwhEtb}{" "}
-                ETB/kWh) are planning assumptions from{" "}
-                <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-[11px]">
-                  /lib/config.ts
-                </code>
-                . You can inspect or edit these assumptions below.
+                {t.results.assumptionsAlertBody({
+                  overheadPct: Math.round(
+                    config.installationOverheadPct * 100
+                  ),
+                  lossesPct: Math.round(config.systemLosses * 100),
+                  dodPct: Math.round(config.batteryDepthOfDischarge * 100),
+                  gridTariff: config.gridTariffPerKwhEtb,
+                  genCost: config.generatorFuelCostPerKwhEtb,
+                })}
               </AlertDescription>
             </div>
           </div>
@@ -463,10 +483,12 @@ function ResultsContent() {
             variant="outline"
             size="sm"
             onClick={() => setShowAssumptionsEditor((prev) => !prev)}
-            className="shrink-0 border-amber-300 bg-white text-amber-950 hover:bg-amber-100/60"
+            className="shrink-0 self-start border-amber-300 bg-white text-amber-950 hover:bg-amber-100/60"
           >
             <SlidersHorizontal className="size-3.5" />
-            {showAssumptionsEditor ? "Hide Assumptions" : "Edit Assumptions"}
+            {showAssumptionsEditor
+              ? t.results.hideAssumptionsBtn
+              : t.results.editAssumptionsBtn}
           </Button>
         </div>
 
@@ -475,7 +497,7 @@ function ResultsContent() {
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
               <div className="flex flex-col gap-1">
                 <Label htmlFor="cfg-panel-cost" className="text-amber-950">
-                  Panel Cost (ETB/kW) [Assumption]
+                  {t.results.assumptionFields.panelCost}
                 </Label>
                 <Input
                   id="cfg-panel-cost"
@@ -498,7 +520,7 @@ function ResultsContent() {
 
               <div className="flex flex-col gap-1">
                 <Label htmlFor="cfg-battery-cost" className="text-amber-950">
-                  Battery Cost (ETB/kWh) [Assumption]
+                  {t.results.assumptionFields.batteryCost}
                 </Label>
                 <Input
                   id="cfg-battery-cost"
@@ -521,7 +543,7 @@ function ResultsContent() {
 
               <div className="flex flex-col gap-1">
                 <Label htmlFor="cfg-overhead" className="text-amber-950">
-                  Install Overhead (%) [Assumption]
+                  {t.results.assumptionFields.installOverhead}
                 </Label>
                 <Input
                   id="cfg-overhead"
@@ -542,7 +564,7 @@ function ResultsContent() {
 
               <div className="flex flex-col gap-1">
                 <Label htmlFor="cfg-grid-tariff" className="text-amber-950">
-                  Grid Tariff (ETB/kWh) [Assumption]
+                  {t.results.assumptionFields.gridTariff}
                 </Label>
                 <Input
                   id="cfg-grid-tariff"
@@ -565,7 +587,7 @@ function ResultsContent() {
 
               <div className="flex flex-col gap-1">
                 <Label htmlFor="cfg-gen-cost" className="text-amber-950">
-                  Generator Fuel (ETB/kWh) [Assumption]
+                  {t.results.assumptionFields.generatorFuel}
                 </Label>
                 <Input
                   id="cfg-gen-cost"
@@ -595,7 +617,7 @@ function ResultsContent() {
                   className="h-9 w-full bg-white text-slate-700"
                 >
                   <RotateCcw className="size-3.5" />
-                  Reset Default Assumptions
+                  {t.results.assumptionFields.resetBtn}
                 </Button>
               </div>
             </div>
@@ -606,9 +628,12 @@ function ResultsContent() {
                   key={item.key}
                   className="rounded-lg border border-amber-200/60 bg-white/70 px-2.5 py-1.5"
                 >
-                  <div className="font-medium text-amber-950">{item.label}</div>
+                  <div className="font-medium text-amber-950">
+                    {t.results.assumptionMetaLabels[item.key] ?? item.label}
+                  </div>
                   <div>
-                    Default: {item.value} {item.unit}
+                    {t.results.assumptionFields.defaultLabel} {item.value}{" "}
+                    {item.unit}
                   </div>
                 </div>
               ))}
@@ -622,24 +647,22 @@ function ResultsContent() {
         <CardContent className="flex flex-col gap-4 py-2">
           <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-900">
-                  Ready for real installer pricing in {cityData.city}?
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                  {t.results.quoteCtaTitle(localizedCityName)}
                 </h2>
                 <Badge
                   variant="secondary"
                   className="bg-amber-100 text-amber-900 text-[11px]"
                 >
-                  Free Quote Request
+                  {t.results.quoteCtaBadge}
                 </Badge>
               </div>
               <p className="text-xs sm:text-sm text-slate-600">
-                Request quotes from solar installers in Ethiopia for a{" "}
-                <span className="font-semibold text-slate-800">
-                  {results.recommendedPanelKw.toFixed(2)} kW panel +{" "}
-                {results.batteryKwh.toFixed(2)} kWh battery
-                </span>{" "}
-                system.
+                {t.results.quoteCtaDesc(
+                  results.recommendedPanelKw.toFixed(2),
+                  results.batteryKwh.toFixed(2)
+                )}
               </p>
             </div>
 
@@ -648,17 +671,17 @@ function ResultsContent() {
                 type="button"
                 size="lg"
                 onClick={handleOpenQuoteForm}
-                className="h-12 w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white px-7 text-base font-bold shadow-sm"
+                className="h-12 w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white px-6 text-sm sm:text-base font-bold shadow-sm shrink-0"
               >
                 <MessageSquareQuote className="size-5" />
-                Get quotes
+                {t.results.getQuotesBtn}
               </Button>
             )}
           </div>
 
           {/* Quote Request Form or Confirmation Screen */}
           {showQuoteForm && (
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-xs">
               {submittedQuote ? (
                 <div
                   role="status"
@@ -668,30 +691,19 @@ function ResultsContent() {
                     <CheckCircle2 className="size-7" />
                   </span>
                   <div className="flex flex-col gap-1 max-w-md">
-                    <h3 className="text-lg font-bold text-slate-900">
-                      Quote Request Received!
+                    <h3 className="text-base sm:text-lg font-bold text-slate-900">
+                      {t.results.confirmTitle}
                     </h3>
-                    <p className="text-sm text-slate-600">
-                      Thank you,{" "}
-                      <span className="font-semibold text-slate-900">
-                        {submittedQuote.name}
-                      </span>
-                      . Your request for a{" "}
-                      <span className="font-semibold text-slate-900">
-                        {submittedQuote.panelKw.toFixed(2)} kW panel /{" "}
-                        {submittedQuote.batteryKwh.toFixed(2)} kWh battery
-                      </span>{" "}
-                      system in{" "}
-                      <span className="font-semibold text-slate-900">
-                        {submittedQuote.city}
-                      </span>{" "}
-                      (estimated {formatEtb(submittedQuote.costLow)} –{" "}
-                      {formatEtb(submittedQuote.costHigh)} ETB) has been saved.
-                      Installers will contact you at{" "}
-                      <span className="font-semibold text-slate-900">
-                        {submittedQuote.phone}
-                      </span>
-                      .
+                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                      {t.results.confirmMessage({
+                        name: submittedQuote.name,
+                        panelKw: submittedQuote.panelKw.toFixed(2),
+                        batteryKwh: submittedQuote.batteryKwh.toFixed(2),
+                        cityLabel: translateCityName(submittedQuote.city, lang),
+                        costLow: formatEtb(submittedQuote.costLow),
+                        costHigh: formatEtb(submittedQuote.costHigh),
+                        phone: submittedQuote.phone,
+                      })}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2 pt-2">
@@ -704,7 +716,7 @@ function ResultsContent() {
                         setShowQuoteForm(false);
                       }}
                     >
-                      Done
+                      {t.results.doneBtn}
                     </Button>
                     <Button
                       type="button"
@@ -712,7 +724,7 @@ function ResultsContent() {
                       onClick={() => setSubmittedQuote(null)}
                       className="bg-amber-600 hover:bg-amber-700 text-white"
                     >
-                      Submit Another Request
+                      {t.results.submitAnotherBtn}
                     </Button>
                   </div>
                 </div>
@@ -722,16 +734,16 @@ function ResultsContent() {
                   noValidate
                   className="flex flex-col gap-4"
                 >
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                  <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
                     <div>
                       <h3 className="font-semibold text-sm sm:text-base text-slate-900">
-                        Request Solar Installer Quotes
+                        {t.results.quoteFormTitle}
                       </h3>
                       <p className="text-xs text-slate-500">
-                        Your calculated system size (
-                        {results.recommendedPanelKw.toFixed(2)} kW panel,{" "}
-                        {results.batteryKwh.toFixed(2)} kWh battery) will be
-                        included automatically.
+                        {t.results.quoteFormDesc(
+                          results.recommendedPanelKw.toFixed(2),
+                          results.batteryKwh.toFixed(2)
+                        )}
                       </p>
                     </div>
                     <Button
@@ -739,7 +751,7 @@ function ResultsContent() {
                       variant="ghost"
                       size="icon-sm"
                       onClick={() => setShowQuoteForm(false)}
-                      aria-label="Close quote form"
+                      aria-label={t.results.closeQuoteFormAria}
                     >
                       <X className="size-4" />
                     </Button>
@@ -751,7 +763,7 @@ function ResultsContent() {
                         <AlertCircle className="size-4 text-red-600 shrink-0 mt-0.5" />
                         <div>
                           <AlertTitle className="text-red-900 text-xs font-semibold">
-                            Could not submit quote request
+                            {t.results.submitErrorTitle}
                           </AlertTitle>
                           <AlertDescription className="text-red-800 text-xs">
                             {submitError}
@@ -763,10 +775,12 @@ function ResultsContent() {
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="quote-name">Full Name *</Label>
+                      <Label htmlFor="quote-name">
+                        {t.results.fullNameLabel}
+                      </Label>
                       <Input
                         id="quote-name"
-                        placeholder="e.g. Abebe Bikila"
+                        placeholder={t.results.fullNamePlaceholder}
                         value={quoteName}
                         onChange={(e) => {
                           setQuoteName(e.target.value);
@@ -787,11 +801,13 @@ function ResultsContent() {
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="quote-phone">Phone Number *</Label>
+                      <Label htmlFor="quote-phone">
+                        {t.results.phoneLabel}
+                      </Label>
                       <Input
                         id="quote-phone"
                         type="tel"
-                        placeholder="e.g. 0911234567 or +251911234567"
+                        placeholder={t.results.phonePlaceholder}
                         value={quotePhone}
                         onChange={(e) => {
                           setQuotePhone(e.target.value);
@@ -812,7 +828,9 @@ function ResultsContent() {
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="quote-city">City *</Label>
+                      <Label htmlFor="quote-city">
+                        {t.results.citySelectLabel}
+                      </Label>
                       <Select
                         id="quote-city"
                         value={quoteCity}
@@ -822,7 +840,7 @@ function ResultsContent() {
                       >
                         {ETHIOPIAN_CITIES.map((c) => (
                           <option key={c} value={c}>
-                            {c}
+                            {translateCityName(c, lang)}
                           </option>
                         ))}
                       </Select>
@@ -841,14 +859,16 @@ function ResultsContent() {
                       onClick={() => setShowQuoteForm(false)}
                       disabled={isSubmitting}
                     >
-                      Cancel
+                      {t.results.cancelBtn}
                     </Button>
                     <Button
                       type="submit"
                       disabled={isSubmitting}
                       className="bg-amber-600 hover:bg-amber-700 text-white px-6 font-semibold"
                     >
-                      {isSubmitting ? "Submitting..." : "Submit Quote Request"}
+                      {isSubmitting
+                        ? t.results.submittingQuoteBtn
+                        : t.results.submitQuoteBtn}
                     </Button>
                   </div>
                 </form>
@@ -861,18 +881,20 @@ function ResultsContent() {
       {/* Appliance Load Breakdown Summary */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div>
               <CardTitle className="text-base">
-                Included Appliances ({sessionState.appliances.length})
+                {t.results.includedAppliancesTitle(
+                  sessionState.appliances.length
+                )}
               </CardTitle>
               <CardDescription>
-                Breakdown of your {results.dailyKwh.toFixed(2)} kWh/day load
+                {t.results.includedAppliancesDesc(results.dailyKwh.toFixed(2))}
               </CardDescription>
             </div>
-            <Link href="/">
+            <Link href={`/?lang=${lang}`}>
               <Button variant="outline" size="sm">
-                Edit List
+                {t.results.editListBtn}
               </Button>
             </Link>
           </div>
@@ -886,17 +908,18 @@ function ResultsContent() {
               return (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between py-2"
+                  className="flex items-center justify-between gap-2 py-2"
                 >
-                  <div>
+                  <div className="min-w-0">
                     <span className="font-medium text-slate-900">
-                      {item.name}
+                      {translateApplianceName(item.name, lang)}
                     </span>
                     <span className="ml-2 text-xs text-slate-500">
-                      {item.quantity} × {item.watts}W × {item.hoursPerDay}h/day
+                      {item.quantity} × {item.watts}W × {item.hoursPerDay}{" "}
+                      {t.results.hoursPerDayShort}
                     </span>
                   </div>
-                  <span className="font-mono text-xs font-semibold text-slate-800">
+                  <span className="font-mono text-xs font-semibold text-slate-800 shrink-0">
                     {itemKwh.toFixed(2)} kWh
                   </span>
                 </div>
@@ -913,8 +936,9 @@ export default function ResultsPage() {
   return (
     <React.Suspense
       fallback={
-        <div className="py-12 text-center text-sm text-slate-500">
-          Calculating solar sizing and ETB cost estimates...
+        <div className="flex flex-col items-center justify-center gap-3 py-12 text-center text-sm text-slate-500">
+          <div className="size-7 animate-spin rounded-full border-3 border-amber-200 border-t-amber-600" />
+          <span>የሶላር መጠን እና የዋጋ ግምት በማስላት ላይ... / Calculating...</span>
         </div>
       }
     >

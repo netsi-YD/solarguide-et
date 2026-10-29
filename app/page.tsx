@@ -18,7 +18,6 @@ import {
 
 import {
   APPLIANCE_PRESETS,
-  PROFILE_PRESETS,
   type ApplianceId,
   type ProfilePresetId,
 } from "@/lib/appliances";
@@ -35,6 +34,11 @@ import {
   type EditableApplianceItem,
   type PresetSelection,
 } from "@/lib/urlState";
+import {
+  translateApplianceName,
+  translateCityName,
+} from "@/lib/translations";
+import { useLanguage } from "@/components/LanguageProvider";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -50,12 +54,14 @@ import { Select, Separator } from "@/components/ui/select";
 
 export default function HomePage() {
   const router = useRouter();
+  const { lang, t } = useLanguage();
 
   const [preset, setPreset] = React.useState<PresetSelection>("home");
   const [city, setCity] = React.useState<EthiopianCity>("Addis Ababa");
   const [appliances, setAppliances] = React.useState<EditableApplianceItem[]>(
     () => getDefaultAppliancesForPreset("home")
   );
+  const [isNavigating, setIsNavigating] = React.useState(false);
 
   // Add-appliance controls
   const [selectedApplianceId, setSelectedApplianceId] =
@@ -115,7 +121,6 @@ export default function HomePage() {
   const handleSelectPreset = (nextPreset: PresetSelection) => {
     setPreset(nextPreset);
     if (nextPreset === "custom") {
-      // Keep current list or start with 1 LED bulb if empty so user can edit freely
       const nextList =
         appliances.length > 0
           ? appliances
@@ -189,7 +194,11 @@ export default function HomePage() {
     persistState(preset, city, nextList);
   };
 
-  const handleUpdateQuantity = (id: string, deltaOrValue: number, isDelta: boolean) => {
+  const handleUpdateQuantity = (
+    id: string,
+    deltaOrValue: number,
+    isDelta: boolean
+  ) => {
     const nextList = appliances.map((item) => {
       if (item.id !== id) return item;
       const nextQty = isDelta
@@ -201,7 +210,11 @@ export default function HomePage() {
     persistState(preset, city, nextList);
   };
 
-  const handleUpdateHours = (id: string, deltaOrValue: number, isDelta: boolean) => {
+  const handleUpdateHours = (
+    id: string,
+    deltaOrValue: number,
+    isDelta: boolean
+  ) => {
     const nextList = appliances.map((item) => {
       if (item.id !== id) return item;
       const rawHours = isDelta ? item.hoursPerDay + deltaOrValue : deltaOrValue;
@@ -213,37 +226,37 @@ export default function HomePage() {
   };
 
   const handleCalculate = () => {
+    setIsNavigating(true);
     persistState(preset, city, appliances);
     const queryString = encodeCalculatorSearchParams({
       preset,
       city,
       appliances,
     });
-    router.push(`/results?${queryString}`);
+    router.push(`/results?${queryString}&lang=${lang}`);
   };
 
   const dailyKwh = calculateDailyKwh(appliances);
   const citySunData = FALLBACK_SUN_HOURS[city];
+  const localizedCityName = translateCityName(city, lang);
 
   return (
-    <div className="flex flex-col gap-6 pb-24">
+    <div className="flex flex-col gap-5 sm:gap-6 pb-28">
       {/* Hero section */}
       <section className="flex flex-col gap-1.5">
         <div className="flex items-center gap-2">
           <Badge
             variant="secondary"
-            className="bg-amber-100 text-amber-900 border-amber-200"
+            className="bg-amber-100 text-amber-900 border-amber-200 text-xs"
           >
-            Step 1 of 2 • Load & Location
+            {t.home.stepBadge}
           </Badge>
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-          Size your solar system in minutes
+        <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+          {t.home.title}
         </h1>
-        <p className="text-sm text-slate-600">
-          Choose a preset profile or build a custom appliance list, pick your
-          city in Ethiopia, and get instant panel, battery, and ETB cost
-          estimates.
+        <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+          {t.home.subtitle}
         </p>
       </section>
 
@@ -251,18 +264,16 @@ export default function HomePage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base sm:text-lg">
-            1. Choose a Starting Profile
+            {t.home.step1Title}
           </CardTitle>
-          <CardDescription>
-            Start with a typical Ethiopian load profile or build a custom list
-          </CardDescription>
+          <CardDescription>{t.home.step1Desc}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-2.5">
             <button
               type="button"
               onClick={() => handleSelectPreset("home")}
-              className={`flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left transition-all ${
+              className={`flex flex-col items-start gap-1.5 rounded-xl border p-2.5 sm:p-3 text-left transition-all ${
                 preset === "home"
                   ? "border-amber-500 bg-amber-50/70 ring-2 ring-amber-500/20"
                   : "border-slate-200 bg-white hover:bg-slate-50"
@@ -274,18 +285,18 @@ export default function HomePage() {
                   <span className="size-2 rounded-full bg-amber-500" />
                 )}
               </div>
-              <div className="font-semibold text-sm text-slate-900">
-                {PROFILE_PRESETS.home.name}
+              <div className="font-semibold text-xs sm:text-sm text-slate-900">
+                {t.home.presets.home.name}
               </div>
-              <p className="text-xs text-slate-500 line-clamp-2">
-                Lights, phones, TV & fridge
+              <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2">
+                {t.home.presets.home.shortDesc}
               </p>
             </button>
 
             <button
               type="button"
               onClick={() => handleSelectPreset("small-shop")}
-              className={`flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left transition-all ${
+              className={`flex flex-col items-start gap-1.5 rounded-xl border p-2.5 sm:p-3 text-left transition-all ${
                 preset === "small-shop"
                   ? "border-amber-500 bg-amber-50/70 ring-2 ring-amber-500/20"
                   : "border-slate-200 bg-white hover:bg-slate-50"
@@ -297,18 +308,18 @@ export default function HomePage() {
                   <span className="size-2 rounded-full bg-amber-500" />
                 )}
               </div>
-              <div className="font-semibold text-sm text-slate-900">
-                {PROFILE_PRESETS["small-shop"].name}
+              <div className="font-semibold text-xs sm:text-sm text-slate-900">
+                {t.home.presets["small-shop"].name}
               </div>
-              <p className="text-xs text-slate-500 line-clamp-2">
-                Lights, fan & shop freezer
+              <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2">
+                {t.home.presets["small-shop"].shortDesc}
               </p>
             </button>
 
             <button
               type="button"
               onClick={() => handleSelectPreset("clinic")}
-              className={`flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left transition-all ${
+              className={`flex flex-col items-start gap-1.5 rounded-xl border p-2.5 sm:p-3 text-left transition-all ${
                 preset === "clinic"
                   ? "border-amber-500 bg-amber-50/70 ring-2 ring-amber-500/20"
                   : "border-slate-200 bg-white hover:bg-slate-50"
@@ -320,18 +331,18 @@ export default function HomePage() {
                   <span className="size-2 rounded-full bg-amber-500" />
                 )}
               </div>
-              <div className="font-semibold text-sm text-slate-900">
-                {PROFILE_PRESETS.clinic.name}
+              <div className="font-semibold text-xs sm:text-sm text-slate-900">
+                {t.home.presets.clinic.name}
               </div>
-              <p className="text-xs text-slate-500 line-clamp-2">
-                Vaccine fridge, lights & laptop
+              <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2">
+                {t.home.presets.clinic.shortDesc}
               </p>
             </button>
 
             <button
               type="button"
               onClick={() => handleSelectPreset("custom")}
-              className={`flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left transition-all ${
+              className={`flex flex-col items-start gap-1.5 rounded-xl border p-2.5 sm:p-3 text-left transition-all ${
                 preset === "custom"
                   ? "border-amber-500 bg-amber-50/70 ring-2 ring-amber-500/20"
                   : "border-slate-200 bg-white hover:bg-slate-50"
@@ -343,11 +354,11 @@ export default function HomePage() {
                   <span className="size-2 rounded-full bg-amber-500" />
                 )}
               </div>
-              <div className="font-semibold text-sm text-slate-900">
-                Custom List
+              <div className="font-semibold text-xs sm:text-sm text-slate-900">
+                {t.home.presets.custom.name}
               </div>
-              <p className="text-xs text-slate-500 line-clamp-2">
-                Build your own appliance list
+              <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2">
+                {t.home.presets.custom.shortDesc}
               </p>
             </button>
           </div>
@@ -357,25 +368,26 @@ export default function HomePage() {
       {/* Step 2: Pick a City */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <CardTitle className="text-base sm:text-lg">
-                2. Select Your City
+                {t.home.step2Title}
               </CardTitle>
-              <CardDescription>
-                Determines average daily peak sun hours for solar sizing
-              </CardDescription>
+              <CardDescription>{t.home.step2Desc}</CardDescription>
             </div>
-            <Badge variant="outline" className="gap-1 bg-amber-50/60 text-amber-900 border-amber-200">
+            <Badge
+              variant="outline"
+              className="gap-1 bg-amber-50/60 text-amber-900 border-amber-200"
+            >
               <Sun className="size-3.5 text-amber-600" />
-              {citySunData.peakSunHours} peak sun hrs/day
+              {t.home.peakSunHoursBadge(citySunData.peakSunHours)}
             </Badge>
           </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="city-select">City / Region in Ethiopia</Label>
+              <Label htmlFor="city-select">{t.home.cityLabel}</Label>
               <Select
                 id="city-select"
                 value={city}
@@ -385,8 +397,10 @@ export default function HomePage() {
               >
                 {ETHIOPIAN_CITIES.map((cityName) => (
                   <option key={cityName} value={cityName}>
-                    {cityName} ({FALLBACK_SUN_HOURS[cityName].peakSunHours} peak
-                    sun hours/day)
+                    {t.home.cityOptionLabel(
+                      translateCityName(cityName, lang),
+                      FALLBACK_SUN_HOURS[cityName].peakSunHours
+                    )}
                   </option>
                 ))}
               </Select>
@@ -406,7 +420,7 @@ export default function HomePage() {
                   }`}
                 >
                   <MapPin className="size-3" />
-                  {cityName}
+                  {translateCityName(cityName, lang)}
                 </button>
               ))}
             </div>
@@ -420,15 +434,12 @@ export default function HomePage() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <CardTitle className="text-base sm:text-lg">
-                3. Appliance Editor
+                {t.home.step3Title}
               </CardTitle>
-              <CardDescription>
-                Add or remove appliances and adjust quantity and hours per day
-              </CardDescription>
+              <CardDescription>{t.home.step3Desc}</CardDescription>
             </div>
             <Badge variant="secondary" className="font-mono text-xs">
-              {appliances.length} {appliances.length === 1 ? "item" : "items"} •{" "}
-              {dailyKwh.toFixed(2)} kWh/day
+              {t.home.itemsSummaryBadge(appliances.length, dailyKwh.toFixed(2))}
             </Badge>
           </div>
         </CardHeader>
@@ -439,7 +450,7 @@ export default function HomePage() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
               <div className="flex-1 flex flex-col gap-1.5">
                 <Label htmlFor="preset-appliance-select">
-                  Add a common appliance
+                  {t.home.addCommonApplianceLabel}
                 </Label>
                 <Select
                   id="preset-appliance-select"
@@ -450,7 +461,10 @@ export default function HomePage() {
                 >
                   {APPLIANCE_PRESETS.map((presetApp) => (
                     <option key={presetApp.id} value={presetApp.id}>
-                      {presetApp.name} ({presetApp.watts}W typical)
+                      {t.home.typicalWattsOption(
+                        t.appliances[presetApp.id],
+                        presetApp.watts
+                      )}
                     </option>
                   ))}
                 </Select>
@@ -462,7 +476,7 @@ export default function HomePage() {
                   className="h-10 flex-1 sm:flex-none bg-amber-600 hover:bg-amber-700 text-white px-4"
                 >
                   <Plus className="size-4" />
-                  Add Appliance
+                  {t.home.addApplianceBtn}
                 </Button>
                 <Button
                   type="button"
@@ -470,7 +484,9 @@ export default function HomePage() {
                   onClick={() => setShowCustomForm((prev) => !prev)}
                   className="h-10 px-3"
                 >
-                  {showCustomForm ? "Cancel" : "+ Custom"}
+                  {showCustomForm
+                    ? t.home.customBtnCancel
+                    : t.home.customBtnOpen}
                 </Button>
               </div>
             </div>
@@ -481,17 +497,21 @@ export default function HomePage() {
                 className="border-t border-slate-200 pt-3 flex flex-col gap-2.5 sm:flex-row sm:items-end"
               >
                 <div className="flex-1 flex flex-col gap-1">
-                  <Label htmlFor="custom-appliance-name">Appliance Name</Label>
+                  <Label htmlFor="custom-appliance-name">
+                    {t.home.customNameLabel}
+                  </Label>
                   <Input
                     id="custom-appliance-name"
-                    placeholder="e.g. Coffee grinder, Router"
+                    placeholder={t.home.customNamePlaceholder}
                     value={customName}
                     onChange={(e) => setCustomName(e.target.value)}
                     required
                   />
                 </div>
                 <div className="w-full sm:w-32 flex flex-col gap-1">
-                  <Label htmlFor="custom-appliance-watts">Power (Watts)</Label>
+                  <Label htmlFor="custom-appliance-watts">
+                    {t.home.customWattsLabel}
+                  </Label>
                   <Input
                     id="custom-appliance-watts"
                     type="number"
@@ -503,7 +523,7 @@ export default function HomePage() {
                   />
                 </div>
                 <Button type="submit" className="h-9 px-4">
-                  Save Custom Item
+                  {t.home.saveCustomBtn}
                 </Button>
               </form>
             )}
@@ -513,13 +533,12 @@ export default function HomePage() {
 
           {/* Appliance List */}
           {appliances.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-300 py-8 text-center">
+            <div className="rounded-xl border border-dashed border-slate-300 py-8 px-4 text-center">
               <p className="text-sm font-medium text-slate-700">
-                No appliances in your list yet
+                {t.home.emptyListTitle}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Select an appliance above and tap &ldquo;Add Appliance&rdquo; or
-                pick a preset profile.
+                {t.home.emptyListDesc}
               </p>
             </div>
           ) : (
@@ -527,25 +546,26 @@ export default function HomePage() {
               {appliances.map((item) => {
                 const itemDailyKwh =
                   (item.watts * item.quantity * item.hoursPerDay) / 1000;
+                const displayName = translateApplianceName(item.name, lang);
                 return (
                   <div
                     key={item.id}
-                    className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs flex flex-col gap-3"
+                    className="rounded-xl border border-slate-200 bg-white p-3 sm:p-3.5 shadow-2xs flex flex-col gap-3"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <span className="font-semibold text-sm text-slate-900">
-                            {item.name}
+                            {displayName}
                           </span>
                           <Badge variant="outline" className="text-[11px]">
-                            {item.watts}W each
+                            {t.home.wattsEachBadge(item.watts)}
                           </Badge>
                         </div>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          Daily energy:{" "}
+                          {t.home.dailyEnergyLabel}{" "}
                           <span className="font-medium text-slate-700">
-                            {itemDailyKwh.toFixed(2)} kWh/day
+                            {itemDailyKwh.toFixed(2)} {t.home.perDayUnit}
                           </span>{" "}
                           ({Math.round(itemDailyKwh * 1000)} Wh)
                         </p>
@@ -556,21 +576,21 @@ export default function HomePage() {
                         variant="ghost"
                         size="icon-sm"
                         onClick={() => handleRemoveAppliance(item.id)}
-                        aria-label={`Remove ${item.name}`}
-                        className="text-slate-400 hover:text-red-600 hover:bg-red-50"
+                        aria-label={t.home.removeAriaLabel(displayName)}
+                        className="text-slate-400 hover:text-red-600 hover:bg-red-50 shrink-0"
                       >
                         <Trash2 className="size-4" />
                       </Button>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 pt-1 border-t border-slate-100">
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 pt-2 border-t border-slate-100">
                       {/* Quantity Control */}
                       <div className="flex items-center justify-between gap-2">
                         <Label
                           htmlFor={`qty-${item.id}`}
                           className="text-xs text-slate-600"
                         >
-                          Quantity
+                          {t.home.quantityLabel}
                         </Label>
                         <div className="flex items-center gap-1.5">
                           <Button
@@ -581,7 +601,7 @@ export default function HomePage() {
                               handleUpdateQuantity(item.id, -1, true)
                             }
                             disabled={item.quantity <= 1}
-                            aria-label={`Decrease quantity for ${item.name}`}
+                            aria-label={t.home.decreaseQtyAria(displayName)}
                           >
                             <Minus className="size-3.5" />
                           </Button>
@@ -598,7 +618,7 @@ export default function HomePage() {
                                 false
                               )
                             }
-                            className="h-7 w-16 text-center px-1 font-medium"
+                            className="h-7 w-14 sm:w-16 text-center px-1 font-medium"
                           />
                           <Button
                             type="button"
@@ -607,7 +627,7 @@ export default function HomePage() {
                             onClick={() =>
                               handleUpdateQuantity(item.id, 1, true)
                             }
-                            aria-label={`Increase quantity for ${item.name}`}
+                            aria-label={t.home.increaseQtyAria(displayName)}
                           >
                             <Plus className="size-3.5" />
                           </Button>
@@ -620,7 +640,7 @@ export default function HomePage() {
                           htmlFor={`hrs-${item.id}`}
                           className="text-xs text-slate-600"
                         >
-                          Hours / day
+                          {t.home.hoursPerDayLabel}
                         </Label>
                         <div className="flex items-center gap-1.5">
                           <Button
@@ -631,7 +651,7 @@ export default function HomePage() {
                               handleUpdateHours(item.id, -0.5, true)
                             }
                             disabled={item.hoursPerDay <= 0.5}
-                            aria-label={`Decrease hours for ${item.name}`}
+                            aria-label={t.home.decreaseHrsAria(displayName)}
                           >
                             <Minus className="size-3.5" />
                           </Button>
@@ -649,7 +669,7 @@ export default function HomePage() {
                                 false
                               )
                             }
-                            className="h-7 w-16 text-center px-1 font-medium"
+                            className="h-7 w-14 sm:w-16 text-center px-1 font-medium"
                           />
                           <Button
                             type="button"
@@ -659,7 +679,7 @@ export default function HomePage() {
                               handleUpdateHours(item.id, 0.5, true)
                             }
                             disabled={item.hoursPerDay >= 24}
-                            aria-label={`Increase hours for ${item.name}`}
+                            aria-label={t.home.increaseHrsAria(displayName)}
                           >
                             <Plus className="size-3.5" />
                           </Button>
@@ -675,18 +695,18 @@ export default function HomePage() {
       </Card>
 
       {/* Sticky Mobile-First Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-xs p-3 shadow-lg">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-1">
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-amber-100 text-amber-800">
-              <Zap className="size-4.5" />
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-xs p-2.5 sm:p-3 shadow-lg">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="flex size-8 sm:size-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-800">
+              <Zap className="size-4" />
             </span>
-            <div>
-              <div className="text-xs text-slate-500">
-                Total Daily Load • {city}
+            <div className="min-w-0">
+              <div className="text-[11px] sm:text-xs text-slate-500 truncate">
+                {t.home.totalDailyLoadLabel(localizedCityName)}
               </div>
-              <div className="text-base font-bold text-slate-900">
-                {dailyKwh.toFixed(2)} kWh/day
+              <div className="text-sm sm:text-base font-bold text-slate-900">
+                {dailyKwh.toFixed(2)} {t.home.perDayUnit}
               </div>
             </div>
           </div>
@@ -694,11 +714,11 @@ export default function HomePage() {
           <Button
             type="button"
             size="lg"
-            disabled={appliances.length === 0 || dailyKwh <= 0}
+            disabled={appliances.length === 0 || dailyKwh <= 0 || isNavigating}
             onClick={handleCalculate}
-            className="h-11 bg-amber-600 hover:bg-amber-700 text-white px-5 font-semibold shadow-xs"
+            className="h-10 sm:h-11 bg-amber-600 hover:bg-amber-700 text-white px-3.5 sm:px-5 text-xs sm:text-sm font-semibold shadow-xs shrink-0"
           >
-            See Solar Results
+            {t.home.seeResultsBtn}
             <ArrowRight className="size-4" />
           </Button>
         </div>

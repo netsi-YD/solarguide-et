@@ -21,6 +21,12 @@ import {
   isValidPhoneNumber,
   validateQuoteForm,
 } from "./quoteValidation.ts";
+import {
+  DEFAULT_LANGUAGE,
+  TRANSLATIONS,
+  translateApplianceName,
+  translateCityName,
+} from "./translations.ts";
 
 describe("Stage 1: Solar Calculator Logic & Supporting Modules", () => {
   describe("calculator.ts - Hand-checked examples", () => {
@@ -234,6 +240,23 @@ describe("Stage 1: Solar Calculator Logic & Supporting Modules", () => {
       assert.equal(valid.valid, true);
       assert.equal(valid.sanitized.name, "Abebe Bikila");
       assert.equal(valid.sanitized.phone, "0911234567");
+    });
+
+    it("returns localized validation errors in Amharic and English", () => {
+      assert.equal(DEFAULT_LANGUAGE, "am");
+      const invalidAm = validateQuoteForm(
+        { name: "", phone: "bad", city: "" },
+        "am"
+      );
+      assert.equal(invalidAm.errors.name, TRANSLATIONS.am.validation.nameRequired);
+      assert.equal(invalidAm.errors.phone, TRANSLATIONS.am.validation.phoneInvalid);
+
+      assert.equal(translateCityName("Addis Ababa", "am"), "አዲስ አበባ");
+      assert.equal(translateCityName("Addis Ababa", "en"), "Addis Ababa");
+      assert.equal(
+        translateApplianceName("LED bulb", "am"),
+        TRANSLATIONS.am.appliances["led-bulb"]
+      );
     });
   });
 });

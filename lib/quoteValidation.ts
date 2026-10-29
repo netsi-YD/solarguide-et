@@ -1,3 +1,5 @@
+import { TRANSLATIONS, type Language } from "./translations.ts";
+
 export interface QuoteFormInput {
   name: string;
   phone: string;
@@ -40,28 +42,31 @@ export function isValidPhoneNumber(rawPhone: string): boolean {
   return ethiopianPattern.test(compact) || internationalPattern.test(compact);
 }
 
-export function validateQuoteForm(input: QuoteFormInput): QuoteValidationResult {
+export function validateQuoteForm(
+  input: QuoteFormInput,
+  lang: Language = "en"
+): QuoteValidationResult {
   const name = input.name.trim();
   const phone = input.phone.trim();
   const city = input.city.trim();
 
+  const messages = TRANSLATIONS[lang].validation;
   const errors: QuoteValidationResult["errors"] = {};
 
   if (!name) {
-    errors.name = "Please enter your name.";
+    errors.name = messages.nameRequired;
   } else if (name.length < 2) {
-    errors.name = "Name must be at least 2 characters.";
+    errors.name = messages.nameTooShort;
   }
 
   if (!phone) {
-    errors.phone = "Please enter your phone number.";
+    errors.phone = messages.phoneRequired;
   } else if (!isValidPhoneNumber(phone)) {
-    errors.phone =
-      "Please enter a valid Ethiopian phone number (e.g. 0911234567 or +251911234567).";
+    errors.phone = messages.phoneInvalid;
   }
 
   if (!city) {
-    errors.city = "Please select a city.";
+    errors.city = messages.cityRequired;
   }
 
   return {
